@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Extrahiert allen sichtbaren Text aus index.html (+ den dynamischen Strings
 aus js/app.js) in ein editierbares Markdown-File."""
+import os
 import re, html
 from html.parser import HTMLParser
 
-SRC = '/Users/peterschaefer/dev/inv_pendulum_mpc/index.html'
-OUT = '/Users/peterschaefer/dev/inv_pendulum_mpc/TEXT.md'
+ROOT = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(ROOT, 'index.html')
+OUT = os.path.join(ROOT, 'TEXT.md')
+APP = os.path.join(ROOT, 'js', 'app.js')
 
 VOID = {'br', 'img', 'input', 'meta', 'link', 'hr'}
 
@@ -102,6 +105,10 @@ def inline(node, mark_modes=True):
             parts.append(' [expert: ' + inline(k, False).strip() + '] ')
         elif mark_modes and ('simple-only' in cls or only == 'simple'):
             parts.append(' [simple: ' + inline(k, False).strip() + '] ')
+        elif mark_modes and 'manual-only' in cls:
+            parts.append(' [beat: ' + inline(k, False).strip() + '] ')
+        elif mark_modes and 'mpc-only' in cls:
+            parts.append(' [controller: ' + inline(k, False).strip() + '] ')
         elif k.tag == 'math':
             parts.append('⟨formula⟩')
         elif k.tag in ('b', 'strong'):
@@ -178,6 +185,8 @@ A('- `⟨formula⟩` is a MathML formula, not editable here. Tell me in plain wo
 A('  should change.')
 A('- `[expert]` = shown in expert mode only, `[simple]` = simple mode only, no marker =')
 A('  both. Whole sections marked `[expert]` are hidden in simple mode.')
+A('- `[beat]` = only while "Beat the Controller" is on, `[controller]` = only while the')
+A('  MPC is driving.')
 A('- Deleting a whole entry is fine — say so and I will remove the element too.')
 A('')
 A('---')
@@ -276,17 +285,20 @@ for btn in find_all(root, cls='preset'):
     subs = [k for k in btn.kids if not isinstance(k, Text) and k.tag == 'span']
     A('- ' + mark + '**' + name + '** — ' + (txt(subs[0]) if subs else ''))
 A('')
-A('`presets.hint:`')
-A('')
-A(txt(find(defcard, cls='hint')))
-A('')
+_ph = find(defcard, cls='hint')
+if _ph is not None:
+    A('`presets.hint:`')
+    A('')
+    A(txt(_ph))
+    A('')
 
 # ----------------------------------------------------------- mode button ---
-A('## 6 · Mode button')
+A('## 6 · Mode buttons')
 A('')
-A('Two states, label plus subtitle. These live in `js/app.js`.')
+A('Two buttons side by side, each with a label and a subtitle. The labels live in')
+A('`js/app.js`, the note below them in `index.html`.')
 A('')
-appjs = open('/Users/peterschaefer/dev/inv_pendulum_mpc/js/app.js', encoding='utf-8').read()
+appjs = open(APP, encoding='utf-8').read()
 m = re.search(r"expert \? 'Simple mode' : 'Expert mode';", appjs)
 A('`mode.button.toExpert:`  (shown while in simple mode)')
 A('')
@@ -294,7 +306,20 @@ A('**Expert mode** — show the model, all tuning parameters and diagnostics')
 A('')
 A('`mode.button.toSimple:`  (shown while in expert mode)')
 A('')
-A('**Simple mode** — back to the essentials — hides the details and restores the defaults')
+A('**Simple mode** — back to the essentials')
+A('')
+A('`mode.button.toBeat:`  (second button, shown while the controller is running)')
+A('')
+A('**Beat the Controller** — switch the controller off and balance the rod yourself')
+A('')
+A('`mode.button.toController:`  (same button, shown while you are in control)')
+A('')
+A('**Give me the controller back** — hand the rod back to the MPC')
+A('')
+A('`mode.beatnote:`  [beat]  (the box under the buttons — this is what tells the user to')
+A('drag the cart)')
+A('')
+A(txt(find(root, cls='mode-note')))
 A('')
 
 # ----------------------------------------------------------------- stage ---
@@ -307,7 +332,12 @@ for row in [k for k in hud.kids if not isinstance(k, Text) and 'hud-row' in k.at
     sp = find(row, tag='span')
     if sp is None:
         continue
+    rcls = row.attrs.get('class', '')
     mark = '[expert] ' if row.attrs.get('data-only') == 'expert' else ''
+    if 'manual-only' in rcls:
+        mark = '[beat] '
+    elif 'mpc-only' in rcls:
+        mark = '[controller] '
     A('- ' + mark + txt(sp))
 A('')
 A('`stage.status:`  [expert]  (status line under the readout, one of two)')

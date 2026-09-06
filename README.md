@@ -10,7 +10,7 @@ No build step, no dependencies, no framework — plain HTML, CSS and JavaScript.
 ## Quick start
 
 ```bash
-git clone https://github.com/peter-schaefer-robotics/inv_pendulum_mpc.git
+git clone https://github.com/peter-schaefer-robotics/robot_on_a_stick.git
 ```
 
 Then just double-click `index.html`. The page deliberately uses classic `<script>` tags
