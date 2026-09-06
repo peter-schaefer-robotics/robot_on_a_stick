@@ -9,6 +9,16 @@
 
   var colors = {};
 
+  // The robot head is loaded once from the inlined SVG. Until it is decoded we
+  // fall back to a plain disc, so nothing pops or flickers on first paint.
+  var robotImg = null, robotReady = false;
+  function ensureRobot() {
+    if (robotImg || !IPM.robot) return;
+    robotImg = new Image();
+    robotImg.onload = function () { robotReady = true; };
+    robotImg.src = IPM.robot.dataUri;
+  }
+
   function readColors() {
     var cs = getComputedStyle(document.documentElement);
     var pick = function (n, fb) { return (cs.getPropertyValue(n) || fb).trim(); };
@@ -23,7 +33,8 @@
       accent2: pick('--accent-2', '#e0a33e'),
       danger: pick('--danger', '#e2626b'),
       ok: pick('--ok', '#7cc47f'),
-      violet: pick('--violet', '#a98cf0')
+      violet: pick('--violet', '#a98cf0'),
+      bobBg: pick('--bob-bg', '#eef2f7')
     };
     return colors;
   }
@@ -162,7 +173,7 @@
     var pivotX = X(p), pivotY = groundY - cartH * 0.82;
     var bobX = X(p + l * Math.sin(th));
     var bobY = Y(l * Math.cos(th)) - cartH * 0.82;
-    var bobR = Math.max(7, 0.05 * scale);
+    var bobR = Math.max(11, 0.07 * scale);   // big enough to show the robot
 
     // trace of the ball
     if (v.trace && v.trace.length > 1) {
@@ -226,7 +237,7 @@
     ctx.beginPath(); ctx.arc(pivotX + cartW * 0.28, groundY, wr, 0, 6.2832); ctx.fill();
     ctx.restore();
 
-    // rod and ball
+    // rod, pivot and the robot head at the tip
     ctx.save();
     ctx.strokeStyle = C.fg;
     ctx.lineWidth = Math.max(3, 0.016 * scale);
@@ -234,11 +245,28 @@
     ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bobX, bobY); ctx.stroke();
     ctx.fillStyle = withAlpha(C.fg, 0.9);
     ctx.beginPath(); ctx.arc(pivotX, pivotY, Math.max(2.5, bobR * 0.22), 0, 6.2832); ctx.fill();
-    var grd = ctx.createRadialGradient(bobX - bobR * 0.35, bobY - bobR * 0.35, bobR * 0.15, bobX, bobY, bobR);
-    grd.addColorStop(0, withAlpha(C.accent2, 1));
-    grd.addColorStop(1, withAlpha(C.accent2, 0.72));
-    ctx.fillStyle = grd;
-    ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, 6.2832); ctx.fill();
+    ctx.restore();
+
+    ensureRobot();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, 6.2832);
+    ctx.fillStyle = C.bobBg;
+    ctx.fill();
+    if (robotReady) {
+      ctx.save();
+      ctx.clip();
+      // Scale the artwork (not the viewBox) to fill the disc and centre it.
+      var bx = IPM.robot.box;
+      var sc = 1.94 * bobR / bx.h;
+      ctx.drawImage(robotImg, bobX - bx.cx * sc, bobY - bx.cy * sc, 200 * sc, 200 * sc);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = withAlpha(C.accent2, 0.9);
+      ctx.fill();
+    }
+    ctx.strokeStyle = withAlpha(C.fg, 0.55);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
     ctx.restore();
 
     // forces
@@ -260,6 +288,20 @@
         arrow(ctx, bobX - fLen, bobY, bobX - Math.sign(fLen) * bobR * 1.15, bobY,
               withAlpha(C.danger, 0.95), 3);
       }
+    }
+
+    // the rubber band while the user drags the cart
+    if (v.drag && v.drag.active) {
+      var dxp = X(v.drag.x), dyp = groundY - cartH * 0.5;
+      ctx.save();
+      ctx.strokeStyle = withAlpha(C.accent, 0.75);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(pivotX, dyp); ctx.lineTo(dxp, dyp); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = withAlpha(C.accent, 0.9);
+      ctx.beginPath(); ctx.arc(dxp, dyp, 5, 0, 6.2832); ctx.fill();
+      ctx.restore();
     }
 
     // radius of influence of the pointer

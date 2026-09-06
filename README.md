@@ -25,6 +25,21 @@ python3 -m http.server 8000
 
 Tested in current Chrome, Firefox, Safari and Edge, on desktop and mobile.
 
+## Beat the Controller
+
+A second button next to the mode switch turns the MPC off and hands the cart to you: click
+anywhere in the scene and drag to pull it left or right, through a spring-damper that is
+clipped to the same 15 N the controller gets. The rod starts perfectly upright, cannot be
+pushed any more, and stays up until you move. A clock counts how long you keep it within 60°,
+and remembers your best run.
+
+It runs at **half speed**, deliberately. A 0.5 m pendulum has a time constant of about
+0.19 s; measured against a human reaction time of ~150 ms, even optimal play survives roughly
+3.5 seconds in real time — too short to learn anything from. At half speed the same strategy
+lasts around 14 s. The physics is untouched, only playback is slowed, the clock counts
+simulated seconds, and the page says so. The controller, meanwhile, does this in real time
+and indefinitely.
+
 ## Two modes
 
 The page starts in **simple mode**: the cost function, the state vector, three presets and
@@ -52,8 +67,9 @@ uses the more common combination: a shorter horizon plus the Riccati terminal we
 
 | Input | Effect |
 | --- | --- |
-| Mouse near the ball | pushes the pendulum (horizontal force on the pendulum mass) |
+| Mouse near the robot head | pushes the pendulum (horizontal force on the pendulum mass) |
 | Click on the scene | sets the cart's target position |
+| Click and drag (Beat the Controller) | pulls the cart yourself |
 | Q and R fields | change the weights — takes effect immediately |
 | Space | pause / resume |
 | `R` | reset |
@@ -133,12 +149,16 @@ expert mode you can untick the automatic solution and type your own diagonal ins
 ```
 index.html          page structure, formulas as MathML (no external library)
 styles.css          layout and colours; light/dark via CSS variables
+js/robot.js         the robot head that rides on the rod, inlined as an SVG string
 js/linalg.js        minimal matrix library including the matrix exponential
 js/model.js         nonlinear plant dynamics, RK4, linearisation
 js/mpc.js           prediction matrices, Riccati, QP solver, controller class
 js/render.js        canvas drawing: scene, time histories, input sequence
 js/app.js           simulation loop, controls, disturbances, mode switching
+assets/             the original robot-head.svg the inlined artwork comes from
 astro/              example component for embedding in an Astro site
+TEXT.md             every visible string on the page, for editing the copy in one file
+tools_extract_text.py   regenerates TEXT.md from index.html
 ```
 
 `window.IPM.app` exposes the simulation state, the controller and the parameters in the
@@ -148,8 +168,15 @@ browser console — useful for experimenting:
 IPM.app.ctrl.configure({ q: [10, 1, 300, 10], R: 0.05 });
 IPM.app.kick(1);
 IPM.app.setMode('expert');
+IPM.app.setPlayMode('manual');   // controller off, you drive
 IPM.app.result();     // last QP solution including solve time
+IPM.app.step(0.02);   // advance the simulation by hand, independent of the animation
 ```
+
+The robot head is inlined as an SVG string in `js/robot.js` rather than loaded from
+`assets/`: a separate file would be blocked as a cross-origin request when the page is opened
+straight from the file system. Edit `assets/robot-head.svg` and copy the shapes over if you
+want a different one.
 
 ## URL parameters
 

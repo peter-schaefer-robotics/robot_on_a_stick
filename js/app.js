@@ -22,6 +22,20 @@
   var MOUSE_RADIUS = 0.32;     // radius of influence of the pointer [m]
   var LS = 'ipm-mpc:';
 
+  // "Beat the Controller": the pointer pulls the cart through a spring-damper,
+  // so the user drives the very same force input the MPC would - including its
+  // bound. Dragging the cart to a position directly would allow infinite force
+  // and make the comparison meaningless.
+  var DRAG_KP = 200;           // N/m
+  var DRAG_KD = 25;            // Ns/m
+  var FALLEN = 1.05;           // |theta| beyond which a run counts as lost [rad]
+  // A 0.5 m pendulum has a time constant of ~0.19 s. Measured against a human
+  // reaction time of ~150 ms, even perfect play survives about 3.5 s in real
+  // time - too short to learn anything from. At half speed the same strategy
+  // lasts around 14 s, so the mode runs in slow motion and says so. The physics
+  // is untouched; only playback is slowed, and the clock counts simulated time.
+  var SLOWMO = 0.5;
+
   var MODE_DEFAULTS = {
     simple: { N: 100, terminal: false, showForces: false },
     expert: { N: 40, terminal: true, showForces: true }
@@ -56,6 +70,9 @@
   var mouse = { x: 0, y: 0, vx: 0, active: false, radius: MOUSE_RADIUS, inside: false };
 
   var uiMode = 'simple';
+  var playMode = 'mpc';        // 'mpc' | 'manual'
+  var drag = { active: false, x: 0, grab: 0 };
+  var beat = { running: false, t: 0, best: 0, failed: false };
   var pAuto = true;
   var pCells = [];
 
@@ -108,6 +125,38 @@
     updateModeButton();
 
     $('modeBtn').blur();
+    // Leaving the settings on defaults also means: the controller is back on.
+    if (playMode === 'manual') setPlayMode('mpc');
+  }
+
+  /** Switch between the MPC driving the cart and the user driving it. */
+  function setPlayMode(m) {
+    playMode = m;
+    document.body.setAttribute('data-play', m);
+    drag.active = false;
+    $('scene').classList.remove('grabbing');
+    beat.running = false;
+    beat.failed = false;
+    beat.t = 0;
+    lastRes = null;
+    ctrl.reset();
+    reset(0);                  // start perfectly upright, at rest
+    updateModeButton();
+    if (m === 'manual') {
+      $('hudJ').textContent = '–';
+      $('hudMs').textContent = '–';
+      $('hudIter').textContent = '–';
+      $('hudStatus').textContent = '';
+      $('hudStatus').className = 'hud-row status';
+    }
+    $('playModeBtn').blur();
+  }
+
+  /** Force the user commands while dragging: a spring-damper on the cart. */
+  function manualForce() {
+    if (!drag.active) return 0;
+    var u = DRAG_KP * (drag.x - sim.s[0]) - DRAG_KD * sim.s[1];
+    return clamp(u, -ctrl.cfg.umax, ctrl.cfg.umax);
   }
 
   function updateModeButton() {
@@ -115,8 +164,15 @@
     $('modeBtn').querySelector('.mode-btn-label').textContent =
       expert ? 'Simple mode' : 'Expert mode';
     $('modeBtn').querySelector('.mode-btn-sub').textContent = expert
-      ? 'back to the essentials — hides the details and restores the defaults'
+      ? 'back to the essentials'
       : 'show the model, all tuning parameters and diagnostics';
+
+    var manual = playMode === 'manual';
+    $('playModeBtn').querySelector('.mode-btn-label').textContent =
+      manual ? 'Give me the controller back' : 'Beat the Controller';
+    $('playModeBtn').querySelector('.mode-btn-sub').textContent = manual
+      ? 'hand the rod back to the MPC'
+      : 'switch the controller off and balance the rod yourself';
   }
 
   function updatePTermVisibility() {
@@ -359,6 +415,9 @@
     $('modeBtn').addEventListener('click', function () {
       setMode(uiMode === 'simple' ? 'expert' : 'simple');
     });
+    $('playModeBtn').addEventListener('click', function () {
+      setPlayMode(playMode === 'mpc' ? 'manual' : 'mpc');
+    });
 
     $('themeBtn').addEventListener('click', function () {
       setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
@@ -374,12 +433,27 @@
 
     var scene = $('scene');
     var leave = function () { mouse.inside = false; mouse.active = false; mouse.vx = 0; };
+    var endDrag = function () { drag.active = false; scene.classList.remove('grabbing'); };
     scene.addEventListener('pointermove', onPointerMove);
-    scene.addEventListener('pointerleave', leave);
-    scene.addEventListener('pointerup', function (e) { if (e.pointerType === 'touch') leave(); });
-    scene.addEventListener('pointercancel', leave);
+    scene.addEventListener('pointerleave', function () { leave(); endDrag(); });
+    scene.addEventListener('pointerup', function (e) {
+      endDrag();
+      if (e.pointerType === 'touch') leave();
+    });
+    scene.addEventListener('pointercancel', function () { leave(); endDrag(); });
     scene.addEventListener('pointerdown', function (e) {
       if (!lastTf) return;
+      if (playMode === 'manual') {
+        // Relative dragging: remember where the cart was grabbed, so the pull
+        // starts at zero force no matter where in the scene the click lands.
+        drag.active = true;
+        drag.grab = toWorld(e).x - sim.s[0];
+        drag.x = sim.s[0];
+        scene.classList.add('grabbing');
+        if (scene.setPointerCapture) { try { scene.setPointerCapture(e.pointerId); } catch (err) {} }
+        e.preventDefault();
+        return;
+      }
       // Without hover (touch, pen) dragging is the disturbance; the target
       // position is set with the slider there.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') { onPointerMove(e); return; }
@@ -400,6 +474,9 @@
     sim.s = [0, 0, theta0, 0];
     sim.t = 0; sim.u = 0; sim.fd = 0; sim.fdKick = 0; sim.kickTimer = 0;
     ctrl.reset();
+    beat.running = false;
+    beat.failed = false;
+    beat.t = 0;
     hist.t.length = hist.th.length = hist.p.length = hist.u.length = 0;
     trace.length = 0;
     camX = 0;
@@ -428,6 +505,10 @@
     if (!lastTf) return;
     var now = performance.now();
     var pt = toWorld(e);
+    if (playMode === 'manual') {
+      if (drag.active) drag.x = pt.x - drag.grab;
+      return;
+    }
     var dt = (now - lastPointerT) / 1000;
     if (dt > 0 && dt < 0.2) {
       mouse.vx = clamp(0.6 * mouse.vx + 0.4 * ((pt.x - mouse.x) / dt), -12, 12);
@@ -438,7 +519,11 @@
 
   function updateMouseForce(dt) {
     mouse.vx *= Math.exp(-dt / 0.09);
-    if (!mouse.inside || opts.distStrength <= 0) { mouse.active = false; sim.fdMouse = 0; return; }
+    // With the controller off the rod may not be pushed - the cart is the only
+    // handle the user gets.
+    if (playMode === 'manual' || !mouse.inside || opts.distStrength <= 0) {
+      mouse.active = false; sim.fdMouse = 0; return;
+    }
     var bx = sim.s[0] + plant.l * Math.sin(sim.s[2]);
     var by = plant.l * Math.cos(sim.s[2]);
     var d = Math.hypot(mouse.x - bx, mouse.y - by);
@@ -479,10 +564,24 @@
 
   function stepSim(dt) {
     var h = ctrl.cfg.Ts / SUB;
+    if (playMode === 'manual') dt *= SLOWMO;
     acc += dt;
     var guard = 0;
     while (acc >= h && guard++ < 600) {
-      if (subCount % SUB === 0) runController();
+      if (playMode === 'manual') {
+        sim.u = manualForce();
+        if (drag.active && !beat.running && !beat.failed) beat.running = true;
+        if (beat.running) {
+          beat.t += h;
+          if (Math.abs(sim.s[2]) > FALLEN) {
+            beat.running = false;
+            beat.failed = true;
+            if (beat.t > beat.best) beat.best = beat.t;
+          }
+        }
+      } else if (subCount % SUB === 0) {
+        runController();
+      }
       subCount++;
 
       updateMouseForce(h);
@@ -528,8 +627,15 @@
     $('hudTheta').textContent = (sim.s[2] * 180 / Math.PI).toFixed(1) + '°';
     $('hudU').textContent = sim.u.toFixed(2) + ' N';
     $('hudFd').textContent = sim.fd.toFixed(2) + ' N';
+    if (playMode === 'manual') {
+      $('hudBeat').textContent = beat.failed
+        ? beat.t.toFixed(1) + ' s — fallen'
+        : beat.t.toFixed(1) + ' s' + (beat.running ? '' : ' — drag to start');
+      $('hudBest').textContent = beat.best > 0 ? beat.best.toFixed(1) + ' s' : '–';
+    }
     if (uiMode !== 'expert') return;
     $('hudPos').textContent = sim.s[0].toFixed(3) + ' m';
+    if (playMode === 'manual') return;
     if (lastRes) {
       $('hudJ').textContent = lastRes.cost < 1e5 ? lastRes.cost.toFixed(1) : lastRes.cost.toExponential(2);
       $('hudMs').textContent = msAvg.toFixed(3) + ' ms';
@@ -552,7 +658,8 @@
     lastTf = R.drawScene($('scene'), {
       state: sim.s, plant: plant, u: sim.u, fd: sim.fd, xref: sim.xref,
       umax: ctrl.cfg.umax, camX: camX, mouse: mouse,
-      pred: lastRes ? lastRes.xpred : null,
+      pred: (playMode === 'mpc' && lastRes) ? lastRes.xpred : null,
+      drag: drag,
       showPred: opts.showPred, showForces: opts.showForces,
       trace: opts.showTrace ? trace : null
     });
@@ -597,6 +704,7 @@
     bindUI();
     bindPresets();
     ctrl.configure({ q: [10, 1, 100, 10], R: 0.5 });
+    document.body.setAttribute('data-play', 'mpc');
     setMode(qs.mode === 'expert' ? 'expert' : 'simple');
     updatePlayLabel();
 
@@ -606,6 +714,7 @@
     IPM.app = {
       sim: sim, ctrl: ctrl, opts: opts, plant: plant, hist: hist, mouse: mouse,
       reset: reset, kick: kick, setMode: setMode, setTheme: setTheme,
+      setPlayMode: setPlayMode, beat: beat, drag: drag, step: stepSim,
       result: function () { return lastRes; }
     };
 

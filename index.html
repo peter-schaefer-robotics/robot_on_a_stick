@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inverted Pendulum — MPC Playground</title>
-<meta name="description" content="Interactive browser demo of model predictive control on an inverted pendulum: edit the Q and R weight matrices inside the cost function and watch the effect immediately.">
+<meta name="description" content="Interactive browser demo of model predictive control on an inverted pendulum.">
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='7' y='22' width='18' height='7' rx='2' fill='%232b8ca8'/><line x1='16' y1='22' x2='24' y2='5' stroke='%23d8dee9' stroke-width='2.5'/><circle cx='24' cy='5' r='3.5' fill='%23e0a33e'/></svg>">
 </head>
@@ -16,21 +16,26 @@
   <header class="topbar">
     <div class="brand">
       <h1>Inverted Pendulum on a Cart</h1>
+      <p class="lead kicker">Robot on a stick!</p>
       <p class="lead">
-        Balancing a stick on your palm is easy — you feel it tip and you move your hand.
-        This page does the same thing with maths: a controller looks a second or two into the
-        future, works out which cart force keeps the pendulum upright at the lowest
-        <em>cost</em>, applies it, and redoes the whole calculation fifty times a second.
-        What <em>cost</em> means is entirely up to the numbers in the formula below — edit
-        them and watch the pendulum change its mind.
+        This is a fun control theory example made accessible in a playful manner. In Expert
+        mode you can access way more details and functions to change more controller
+        functionalities, plant, and reality parameters.
       </p>
+      <p class="lead">
+        The controller looks a second or two into the future, works out which cart force keeps
+        the pendulum upright at the lowest <em>cost</em>, applies it, and redoes the whole
+        calculation fifty times a second. What <em>cost</em> means is entirely up to the
+        numbers in the formula below. Edit them and watch the pendulum change its mind.
+      </p>
+      <p class="lead cta"><b>Try it out and move your mouse next to the pole tip!</b></p>
     </div>
     <button id="themeBtn" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
   </header>
 
   <!-- ==================== 2. Die Gleichung ==================== -->
   <section class="card eq-card">
-    <h2 class="card-title">The optimization problem — solved fresh every 20 ms</h2>
+    <h2 class="card-title">The optimization problem — solved every 20 ms</h2>
 
     <div class="eq-scroll">
       <div class="eq-main">
@@ -166,15 +171,16 @@
         <ul class="sym-list">
           <li>
             <math class="mf"><mrow><msub><mi>e</mi><mi>k</mi></msub><mo>=</mo><msub><mi>x</mi><mi>k</mi></msub><mo>&#8722;</mo><msub><mi>x</mi><mi>ref</mi></msub></mrow></math>
-            <span>the error the controller <em>expects</em> k steps from now — not a measurement,
-            a prediction from its model. Weighting it with <b>Q</b> is what makes one kind of
-            error more expensive than another.</span>
+            <span>the state error the controller <em>expects</em> k steps from
+            now<span class="simple-only">.</span><span class="expert-only"> — not a
+            measurement, a prediction from its model. Weighting it with <b>Q</b> is what makes
+            one kind of error more expensive than another.</span></span>
           </li>
           <li>
             <math class="mf"><msub><mi>u</mi><mi>k</mi></msub></math>
-            <span>the horizontal force on the cart <span class="unit">[N]</span>, k steps from
-            now. It is the only thing the controller can actually do — nothing pushes the rod
-            directly.</span>
+            <span>the horizontal force on the cart <span class="unit">[N]</span>, k steps
+            from now.<span class="expert-only"> It is the only thing the controller can
+            actually do — nothing pushes the rod directly.</span></span>
           </li>
           <li>
             <math class="mf"><mi>N</mi></math>
@@ -212,10 +218,6 @@
             <b>Short-sighted</b><span>N = 8 without P — it falls over</span>
           </button>
         </div>
-        <p class="hint">
-          Only the <b>ratio</b> between Q and R matters: multiply both by the same number and
-          the controller does exactly the same thing.
-        </p>
       </div>
 
     </div>
@@ -227,7 +229,18 @@
       <span class="mode-btn-label">Expert mode</span>
       <span class="mode-btn-sub">show the model, all tuning parameters and diagnostics</span>
     </button>
+    <button id="playModeBtn" class="btn mode-btn beat-btn">
+      <span class="mode-btn-label">Beat the Controller</span>
+      <span class="mode-btn-sub">switch the controller off and balance the rod yourself</span>
+    </button>
   </div>
+  <p class="mode-note manual-only">
+    <b>You are the controller now — click anywhere in the scene and drag left or right to pull
+    the cart.</b> That is your only handle, and you get the same 15 N limit the MPC has. The
+    rod starts perfectly upright and can no longer be pushed; it stays up until you move.
+    Everything runs at <b>half speed</b>, because at full speed human reaction time loses this
+    game in about three seconds. The clock still counts simulated seconds.
+  </p>
 
   <!-- ==================== 5. Hauptgrafik ==================== -->
   <section class="card stage-card">
@@ -236,7 +249,9 @@
       <div class="hud" id="hud">
         <div class="hud-row"><span>Angle θ</span><b id="hudTheta">–</b></div>
         <div class="hud-row"><span>Control force u</span><b id="hudU">–</b></div>
-        <div class="hud-row"><span>Your disturbance</span><b id="hudFd">–</b></div>
+        <div class="hud-row mpc-only"><span>Your disturbance</span><b id="hudFd">–</b></div>
+        <div class="hud-row manual-only"><span>Balancing time</span><b id="hudBeat">–</b></div>
+        <div class="hud-row manual-only"><span>Your best</span><b id="hudBest">–</b></div>
         <div class="hud-row" data-only="expert"><span>Position p</span><b id="hudPos">–</b></div>
         <div class="hud-sep" data-only="expert"></div>
         <div class="hud-row" data-only="expert"><span>Cost J</span><b id="hudJ">–</b></div>
@@ -257,8 +272,8 @@
       <label class="chk" data-only="expert"><input type="checkbox" id="showTrace"><span>Bob trace</span></label>
     </div>
     <p class="hint">
-      Move the mouse close to the ball to push it around · click the rail to set a new target
-      position · Space = pause, R = reset, arrow keys = kick
+      Move the mouse close to the ball to push it around. Click the rail to set a new target
+      position. Space = pause. R = reset. Arrow keys = kick.
     </p>
   </section>
 
@@ -267,9 +282,9 @@
     <h2 class="card-title">Time histories (last 12 s)</h2>
     <canvas id="scope"></canvas>
     <div class="legend">
-      <span class="lg lg-theta">θ [°]</span>
-      <span class="lg lg-pos">p [m]</span>
-      <span class="lg lg-u">u [N]</span>
+      <span class="lg lg-theta">Angle θ [°]</span>
+      <span class="lg lg-pos">Position p [m]</span>
+      <span class="lg lg-u">Cart force u [N]</span>
     </div>
   </section>
 
@@ -357,17 +372,18 @@
         <summary>The setup</summary>
         <div>
           <p>A cart slides along a horizontal rail. On it sits a freely pivoting rod with a
-          mass at its tip. The only thing you can do is push the cart left or right — there is
-          no motor at the joint. Two things to move, one thing to push with.</p>
+          mass at its tip. The only thing the system can actively do is push the cart left or
+          right — there is no motor at the joint. Two things can move (cart and rod), only one
+          thing can be actuated (cart).</p>
           <p>Upright is an <b>unstable equilibrium</b>. Lean the rod a little and it leans
-          faster and faster: the deviation doubles roughly every 130&nbsp;ms. So the controller
-          has to keep sliding the cart back underneath the centre of mass, forever.</p>
+          faster and faster. The controller has to keep sliding the cart back underneath the
+          centre of mass.</p>
           <p>There is a second goal — the cart should also end up at its target position. Short
           term the two goals fight each other: to get to a target on the right, the cart must
           first duck briefly to the <i>left</i> so the rod tips rightwards. That backward step
-          is visible every time you click a new target, and it is not a flaw — it is what
-          engineers call <b>non-minimum-phase</b> behaviour<span class="expert-only">, a zero
-          in the right half-plane</span>.</p>
+          is visible every time you click a new target, and it is not a flaw.<span
+          class="expert-only"> It is a <b>non-minimum-phase</b> behaviour, a zero in the right
+          half-plane.</span></p>
         </div>
       </details>
 
@@ -378,26 +394,25 @@
           <ol>
             <li><b>Measure</b> where the pendulum is right now.</li>
             <li><b>Predict</b> what would happen over the next N steps for any sequence of cart
-            forces, using a model of the physics.</li>
+            forces, using a model of the plant.</li>
             <li><b>Optimise</b>: find the sequence with the lowest total cost J
             <span class="expert-only">that also respects every bound</span>.</li>
-            <li><b>Apply</b> only the very first force of that sequence, and throw the rest
-            away.</li>
+            <li><b>Apply</b> only the very first input step of that sequence.</li>
             <li><b>Repeat</b>, shifted one step into the future.</li>
           </ol>
-          <p>Throwing away most of the plan sounds wasteful, but it is exactly what turns
-          planning into <b>feedback</b>. Every cycle restarts from a fresh measurement, so a
-          gust of wind, a mouse push or a slightly wrong model all get absorbed automatically.
-          Switch on <i>Prediction</i> above and the ghost trail shows you the plan being
-          reconsidered several times per second.</p>
+          <p>Throwing away most of the plan sounds wasteful, but it is what turns planning
+          into <b>feedback</b>. Every cycle restarts from a fresh measurement, so a gust of
+          wind, a mouse push or a slightly wrong model get absorbed automatically. Switch on
+          <i>Prediction</i> above and the ghost trail shows you the plan being reconsidered
+          several times per second.</p>
         </div>
       </details>
 
       <details open>
         <summary>What Q and R actually do</summary>
         <div>
-          <p>The cost function is a bargain between two wishes: <em>keep the error small</em>
-          (that is Q) and <em>do not use much force</em> (that is R). Both terms are squared,
+          <p>The cost function is a bargain between two wishes: <em>keep the state error
+          small</em> (that is Q) and <em>do not use much force</em> (that is R). Both terms are squared,
           which keeps the problem convex — there is exactly one best answer, and it can be
           found reliably in well under a millisecond.</p>
           <ul>
@@ -415,10 +430,10 @@
           q<sub>p</sub> acts on m², q<sub>θ</sub> on rad². An error of 0.1&nbsp;rad (5.7°) is
           physically far more serious than 0.1&nbsp;m of cart offset, which is why
           q<sub>θ</sub> is usually the biggest number in the matrix.</p>
-          <p class="expert-only">A useful starting point is <b>Bryson's rule</b>: set
-          q<sub>i</sub> = 1 / (largest deviation you can live with)² and
-          R = 1 / u<sub>max</sub>². It rarely gives the final answer, but it gets the orders of
-          magnitude right, which is most of the battle.</p>
+          <p class="expert-only">When trying to set the matrix values of Q and R, a useful
+          starting point is <b>Bryson's rule</b>: set q<sub>i</sub> = 1 / (largest deviation you
+          can live with)² and R = 1 / u<sub>max</sub>². It rarely gives the final answer, but it
+          gets the orders of magnitude right, which is most of the battle.</p>
         </div>
       </details>
 
@@ -427,21 +442,17 @@
         <div>
           <p>Near the ball, your mouse pointer acts like a finger: a horizontal force is
           applied to the pendulum mass, depending on how close you are and how fast you are
-          moving. The controller is told <b>nothing</b> about it. It only sees the consequences
-          in the measured state and reacts — which is exactly the situation in a real plant.</p>
+          moving. The controller is told nothing about it. It only sees the consequences in
+          the measured state and reacts — which is exactly the situation in a real plant.</p>
           <p>Park the pointer against the ball and hold it there. The system settles into a new
           equilibrium with a <b>permanent offset</b>: the rod leans just far enough for the
-          lean to balance your push<span class="expert-only"> — precisely until
-          tan&thinsp;θ = −F<sub>d</sub>/(m&thinsp;g)</span>, and the cart drifts away from its
-          target. Nothing in the cost function accumulates past error, so nothing ever cancels
-          a constant unknown force completely.<span class="expert-only"> The standard fixes are
-          a disturbance observer or a model augmented with an integrating state — usually
-          called offset-free MPC.</span></p>
+          lean to balance your push and the cart drifts away from its target. Nothing in the
+          cost function accumulates past error, so nothing ever cancels a constant unknown
+          force completely.</p>
           <p class="expert-only">Two more realities are on the sliders. <b>Measurement
           noise</b> goes straight into the optimisation, because there is no state estimator
           here — turn it up and the control force gets visibly nervous. <b>Controller model
-          error</b> makes the controller believe in a wrong pendulum mass; being wrong by ±50 %
-          barely matters, which says something reassuring about feedback in general.</p>
+          error</b> makes the controller believe in a wrong pendulum mass.</p>
         </div>
       </details>
 
@@ -475,18 +486,17 @@
             </math>
           </div>
           <p>The controller never sees those equations. It only gets a <b>linearised,
-          discrete-time</b> model — exactly as in practice, where the model is always an
-          approximation of something messier.</p>
+          discrete-time</b> model.</p>
           <p>In <i>linear</i> mode the linearisation happens once, about the upright
           equilibrium; A<sub>d</sub>, B<sub>d</sub> and the QP Hessian are then constant and are
-          only rebuilt when you change a parameter. In <i>nonlinear</i> mode the previously
-          planned input sequence is simulated forward through the nonlinear model and the
-          system is re-linearised at every point along that trajectory — a real-time iteration,
-          one SQP step per sample. It costs about an order of magnitude more computation, and
-          it earns that back by catching the pendulum from deflections where the fixed
-          linearisation is long since nonsense. Swipe the ball hard with the mouse in both
-          modes: the fixed linearisation gives up somewhere past 30–40°, while the nonlinear
-          one keeps catching the pendulum well beyond that.</p>
+          only rebuilt when you change a parameter.</p>
+          <p>In <i>nonlinear</i> mode the previously planned input sequence is simulated forward
+          through the nonlinear model and the system is re-linearised at every point along that
+          trajectory — a real-time iteration, one SQP step per sample. It costs about an order
+          of magnitude more computation, and it earns that back by catching the pendulum from
+          deflections where the fixed linearisation is long since nonsense. Swipe the ball hard
+          with the mouse in both modes: the fixed linearisation gives up somewhere past 30–40°,
+          while the nonlinear one keeps catching the pendulum well beyond that.</p>
         </div>
       </details>
 
@@ -495,8 +505,8 @@
         <div>
           <p>The horizon is finite: whatever happens after step N never enters the sum. That
           makes a short horizon genuinely dangerous — the controller does not <i>see</i> the
-          fall coming and happily calls a cheap, fatal trajectory optimal.</p>
-          <p>P repairs this. As the solution of the discrete algebraic Riccati equation,
+          fall coming.</p>
+          <p>P improves this. As the solution of the discrete algebraic Riccati equation,
           e<sub>N</sub><sup>⊤</sup>P&thinsp;e<sub>N</sub> is exactly the cost an LQR would still
           incur from step N to infinity. Adding it makes a short horizon behave like an
           infinite one, as long as the input bound stays inactive.</p>
@@ -520,12 +530,11 @@
           <p>Without the bound |u<sub>k</sub>| ≤ u<sub>max</sub> this whole problem has a
           closed-form answer: the LQR, a constant state feedback u = −Kx. No optimisation, no
           solver, faster and simpler in every respect.</p>
-          <p>The difference only shows up at the limit. An LQR computes as though the bound did
-          not exist and then gets clipped — it plans with force it will never receive. The MPC
-          puts the bound inside the optimisation, so it knows in advance that it will run out
-          of force later and starts countering earlier. That is what the computation buys you,
-          and it is why MPC dominates in process industries where actuators saturate all
-          day.</p>
+          <p>The difference shows up at the limit. An LQR computes as though the bound did not
+          exist and then gets clipped — it plans with force it will never receive. The MPC puts
+          the bound inside the optimisation, so it knows in advance that it will run out of
+          force later and starts countering earlier. That is what the computation buys
+          you.</p>
           <p>Set u<sub>max</sub> to about 3 N and push the ball hard: the readout reports
           <i>input bound active</i>, and the planned input sequence visibly sits on its
           limit.</p>
@@ -583,7 +592,7 @@
             optimisation or a separate energy-based controller. Nonlinear mode with a long
             horizon does catch the pendulum from surprisingly large angles, though.</li>
             <li>The actuator is ideal — no dead time, no dynamics, no quantisation. Dead time
-            in particular is what usually spoils an MPC design first.</li>
+            can spoil an MPC design.</li>
             <li>No state constraints, so the rail is infinitely long and the cart can wander
             off happily.</li>
           </ul>
@@ -598,6 +607,7 @@
   </footer>
 </div>
 
+<script src="js/robot.js"></script>
 <script src="js/linalg.js"></script>
 <script src="js/model.js"></script>
 <script src="js/mpc.js"></script>

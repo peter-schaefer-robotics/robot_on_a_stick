@@ -28,6 +28,7 @@
   --danger: #ec6b74;
   --ok: #86ce89;
   --violet: #b499f5;
+  --bob-bg: #eef2f7;      /* light disc behind the robot head, both themes */
   --shadow: 0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.22);
   --radius: 14px;
   color-scheme: dark;
@@ -47,6 +48,7 @@ html[data-theme="light"] {
   --danger: #bd3a44;
   --ok: #2f7c38;
   --violet: #5b3fc0;
+  --bob-bg: #ffffff;
   --shadow: 0 1px 2px rgba(16,24,40,.05), 0 10px 28px rgba(16,24,40,.07);
   color-scheme: light;
 }
@@ -70,6 +72,20 @@ body[data-mode="expert"] [data-only="simple"],
 body[data-mode="expert"] .simple-only { display: none !important; }
 
 body.no-pterm .pterm { display: none !important; }
+
+/* Controller on (data-play="mpc") versus "Beat the Controller" (…="manual"). */
+body[data-play="mpc"] .manual-only,
+body[data-play="manual"] .mpc-only { display: none !important; }
+/* With the controller off, the cost function and the presets do nothing - they
+   stay visible so the connection is obvious, but greyed out and inert. */
+body[data-play="manual"] .eq-card,
+body[data-play="manual"] .def-presets {
+  opacity: .38;
+  pointer-events: none;
+  filter: saturate(.4);
+}
+body[data-play="manual"] #scene { cursor: grab; }
+body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 
 /* ------------------------------------------------------------- heading --- */
 .topbar { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 22px; }
@@ -209,7 +225,23 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 .presets .btn.preset.active b { color: var(--accent); }
 
 /* ===================== mode switch ====================================== */
-.mode-switch { display: flex; justify-content: center; margin: 6px 0 22px; }
+.mode-switch {
+  display: flex; justify-content: center; align-items: stretch;
+  gap: 12px; flex-wrap: wrap; margin: 6px 0 14px;
+}
+.mode-note {
+  max-width: 74ch; margin: 0 auto 22px; text-align: center;
+  color: var(--fg-dim); font-size: 15.5px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 12px; padding: 12px 18px;
+}
+.mode-note b { color: var(--fg); }
+.beat-btn .mode-btn-label { color: var(--accent-2); }
+body[data-play="manual"] .beat-btn {
+  border-color: color-mix(in srgb, var(--accent-2) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
+}
 .mode-btn {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 16px 46px; border-radius: 14px;
@@ -220,11 +252,11 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 .mode-btn-label { font-size: 19px; font-weight: 660; letter-spacing: .01em; }
 .mode-btn-sub { font-size: 13.5px; color: var(--fg-faint); }
 /* in simple mode the button is the invitation to go further, so it stands out */
-body[data-mode="simple"] .mode-btn {
+body[data-mode="simple"] #modeBtn {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
-body[data-mode="simple"] .mode-btn-label { color: var(--accent); }
-body[data-mode="expert"] .mode-btn { background: var(--panel); }
+body[data-mode="simple"] #modeBtn .mode-btn-label { color: var(--accent); }
+body[data-mode="expert"] #modeBtn { background: var(--panel); }
 
 /* ========================== stage ======================================= */
 .stage-card { padding: 16px; }
@@ -367,6 +399,8 @@ body.embed .app { padding: 0; max-width: none; }
   .eq-part { gap: 4px; }
   .eq-scroll { padding-bottom: 6px; }
   .mode-btn { width: 100%; }
+  .mode-switch { gap: 9px; }
+  .mode-note { font-size: 14.5px; padding: 11px 14px; }
   /* the readout would cover the whole scene on a phone */
   .hud {
     position: static; margin-top: 11px; min-width: 0;
