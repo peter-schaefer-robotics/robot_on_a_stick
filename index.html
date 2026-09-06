@@ -251,7 +251,6 @@
       <button id="resetBtn" class="btn">Reset</button>
       <button id="kickLeftBtn" class="btn">Kick ←</button>
       <button id="kickRightBtn" class="btn">Kick →</button>
-      <button id="dropBtn" class="btn">Large deflection</button>
       <span class="spacer"></span>
       <label class="chk"><input type="checkbox" id="showPred" checked><span>Prediction</span></label>
       <label class="chk" data-only="expert"><input type="checkbox" id="showForces"><span>Forces</span></label>
@@ -485,7 +484,9 @@
           system is re-linearised at every point along that trajectory — a real-time iteration,
           one SQP step per sample. It costs about an order of magnitude more computation, and
           it earns that back by catching the pendulum from deflections where the fixed
-          linearisation is long since nonsense. Try <i>Large deflection</i> in both modes.</p>
+          linearisation is long since nonsense. Swipe the ball hard with the mouse in both
+          modes: the fixed linearisation gives up somewhere past 30–40°, while the nonlinear
+          one keeps catching the pendulum well beyond that.</p>
         </div>
       </details>
 

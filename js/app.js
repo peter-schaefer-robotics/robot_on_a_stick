@@ -354,7 +354,6 @@
 
     $('playBtn').addEventListener('click', function () { sim.running = !sim.running; updatePlayLabel(); });
     $('resetBtn').addEventListener('click', function () { reset(0.08); });
-    $('dropBtn').addEventListener('click', function () { reset(0.49 * (Math.random() < 0.5 ? -1 : 1)); });
     $('kickLeftBtn').addEventListener('click', function () { kick(-1); });
     $('kickRightBtn').addEventListener('click', function () { kick(1); });
     $('modeBtn').addEventListener('click', function () {
