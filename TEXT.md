@@ -24,7 +24,7 @@ Not visible on the page itself — browser tab and search results.
 
 `meta.title:`
 
-Inverted Pendulum — MPC Playground
+Robot on a stick — Inverted Pendulum MPC Playground
 
 `meta.description:`
 
