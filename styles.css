@@ -126,6 +126,15 @@ body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
   border-left: 3px solid var(--accent); padding: 2px 0 2px 12px;
 }
 .lead.cta::before { content: "→"; color: var(--accent); font-weight: 700; }
+.lead.cta a { color: inherit; text-decoration: none; }
+.lead.cta:hover { border-left-color: var(--accent-2); }
+.lead.cta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* the invitation in the hero jumps to the buttons and the animation */
+#playground { scroll-margin-top: 18px; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 
 /* miniature cart-pole, drawn with plain boxes */
 .hero-art {
