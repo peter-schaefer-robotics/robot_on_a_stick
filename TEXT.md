@@ -38,7 +38,7 @@ Inverted Pendulum on a Cart
 
 `header.intro:`  (the loose 2–3 sentence opener)
 
-Robot on a stick!
+This is a fun control theory example made accessible in a playful manner.
 
 ## 3 · Cost function card
 
@@ -65,7 +65,7 @@ subject to, for k = 0 … N−1:
 
 `state.cardtitle:`
 
-What the controller is looking at
+What the controller looks at, and what it penalises
 
 `state.vector.rows:`  (the four lines next to the state vector ⟨p, ṗ, θ, θ̇⟩)
 
@@ -77,7 +77,9 @@ What the controller is looking at
 `state.symbols:`  (one entry per row; the formula on the left is fixed)
 
 - ⟨formula⟩ the state error the controller *expects* k steps from now [simple:.] [expert: — not a measurement, a prediction from its model. Weighting it with **Q** is what makes one kind of error more expensive than another.]
+- ⟨formula⟩ penalises state error: how expensive each kind of deviation is. Its four diagonal entries line up with the four states above.
 - ⟨formula⟩ the horizontal force on the cart [N], k steps from now. [expert: It is the only thing the controller can actually do — nothing pushes the rod directly.]
+- ⟨formula⟩ penalises expensive actuation: how much that force costs. A large R buys smoothness and pays for it with speed.
 - ⟨formula⟩ how many steps it looks ahead. [simple: Here that is two seconds of future.] [expert: Look-ahead is N · T_s; both are adjustable below.]
 - [expert] ⟨formula⟩ the discrete-time model used for the prediction (zero-order hold, sample time T_s), obtained by linearising the equations of motion.
 

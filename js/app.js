@@ -171,7 +171,7 @@
     $('playModeBtn').querySelector('.mode-btn-label').textContent =
       manual ? 'Give me the controller back' : 'Beat the Controller';
     $('playModeBtn').querySelector('.mode-btn-sub').textContent = manual
-      ? 'hand the rod back to the MPC'
+      ? 'hand the cart back to the MPC'
       : 'switch the controller off and balance the rod yourself';
   }
 
@@ -700,6 +700,9 @@
         ? 'light' : 'dark';
     }
     setTheme(theme);
+
+    var heroImg = $('heroRobot');
+    if (heroImg && IPM.robot) heroImg.src = IPM.robot.dataUri;
 
     bindUI();
     bindPresets();

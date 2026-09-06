@@ -87,15 +87,89 @@ body[data-play="manual"] .def-presets {
 body[data-play="manual"] #scene { cursor: grab; }
 body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 
-/* ------------------------------------------------------------- heading --- */
-.topbar { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 22px; }
-.brand { flex: 1; min-width: 0; }
-.brand h1 {
-  margin: 0 0 8px; font-size: clamp(24px, 3.4vw, 34px);
-  font-weight: 640; letter-spacing: -.015em; line-height: 1.18;
+/* ------------------------------------------------------------------ hero --- */
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 30px;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 26px 30px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 88% 10%,
+      color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 58%),
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--accent-2) 8%, var(--panel)) 0%, var(--panel) 62%);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
-.lead { margin: 0; color: var(--fg-dim); font-size: 17px; max-width: 74ch; }
+.hero-theme { position: absolute; top: 14px; right: 14px; }
+.hero-text { min-width: 0; }
+.hero h1 {
+  margin: 0 0 10px; font-size: clamp(25px, 3.4vw, 35px);
+  font-weight: 660; letter-spacing: -.018em; line-height: 1.14;
+  padding-right: 52px;
+}
+.kicker {
+  margin: 0 0 14px; font-size: 21px; line-height: 1.3;
+  color: var(--accent-2); letter-spacing: -.01em;
+}
+.lead { margin: 0 0 13px; color: var(--fg-dim); font-size: 17px; max-width: 68ch; }
+.lead:last-child { margin-bottom: 0; }
 .lead em { color: var(--fg); font-style: normal; font-weight: 600; }
+.lead.cta {
+  margin-top: 16px; color: var(--fg); font-weight: 600;
+  display: inline-flex; align-items: baseline; gap: 9px;
+  border-left: 3px solid var(--accent); padding: 2px 0 2px 12px;
+}
+.lead.cta::before { content: "→"; color: var(--accent); font-weight: 700; }
+
+/* miniature cart-pole, drawn with plain boxes */
+.hero-art {
+  display: flex; flex-direction: column; align-items: center;
+  width: 178px; padding-bottom: 4px;
+}
+.hero-rig {
+  display: flex; flex-direction: column; align-items: center;
+  transform-origin: 50% 100%;
+  animation: hero-sway 5.5s ease-in-out infinite alternate;
+}
+.hero-head {
+  width: 92px; height: 92px; border-radius: 50%;
+  background: var(--bob-bg);
+  border: 1.5px solid color-mix(in srgb, var(--fg) 45%, transparent);
+  display: grid; place-items: center; overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+.hero-head img { width: 108%; height: 108%; object-fit: contain; display: block; }
+.hero-rod {
+  width: 6px; height: 74px; margin-top: -2px;
+  background: var(--fg); border-radius: 3px; opacity: .85;
+}
+.hero-cart {
+  position: relative; width: 104px; height: 40px; margin-top: -3px;
+  border: 2px solid var(--accent); border-radius: 7px;
+  background: var(--panel-2);
+  display: flex; justify-content: space-around; align-items: flex-end;
+}
+.hero-cart span {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg-faint); margin-bottom: -7px;
+}
+.hero-rail {
+  width: 100%; height: 3px; border-radius: 2px; margin-top: 7px;
+  background: color-mix(in srgb, var(--fg-faint) 60%, transparent);
+}
+@keyframes hero-sway {
+  from { transform: rotate(-7deg) translateX(-6px); }
+  to   { transform: rotate(7deg) translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-rig { animation: none; }
+}
 
 .icon-btn {
   background: var(--panel); color: var(--fg); border: 1px solid var(--border);
@@ -378,6 +452,12 @@ body.embed .app { padding: 0; max-width: none; }
 
 /* ========================= responsive =================================== */
 @media (max-width: 980px) {
+  .hero { grid-template-columns: 1fr; gap: 18px; justify-items: center; }
+  .hero-text { order: 1; }
+  .hero-art { order: 2; width: 150px; }
+  .hero-head { width: 76px; height: 76px; }
+  .hero-rod { height: 58px; }
+  .hero-cart { width: 88px; height: 34px; }
   .def-cols { grid-template-columns: 1fr; gap: 20px; }
   .settings-grid { grid-template-columns: 1fr; }
   .ex-grid { columns: 1; }
@@ -386,6 +466,9 @@ body.embed .app { padding: 0; max-width: none; }
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .app { padding: 16px 13px 44px; }
+  .hero { padding: 20px 18px; border-radius: 14px; }
+  .kicker { font-size: 19px; }
+  .lead { font-size: 16px; }
   #scene { aspect-ratio: 4 / 3; }
   .cell { width: 34px; height: 25px; font-size: 11.5px; }
   .cell.ro { font-size: 10px; }

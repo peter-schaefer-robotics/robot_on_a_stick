@@ -13,24 +13,40 @@
 <div class="app">
 
   <!-- ==================== 1. Kopf und Einleitung ==================== -->
-  <header class="topbar">
-    <div class="brand">
+  <header class="hero">
+    <button id="themeBtn" class="icon-btn hero-theme" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
+
+    <div class="hero-text">
       <h1>Inverted Pendulum on a Cart</h1>
-      <p class="lead kicker">Robot on a stick!</p>
-      <p class="lead">
-        This is a fun control theory example made accessible in a playful manner. In Expert
-        mode you can access way more details and functions to change more controller
-        functionalities, plant, and reality parameters.
-      </p>
+
+      <p class="kicker"><b>Robot on a stick!</b></p>
+
+      <p class="lead">This is a fun control theory example made accessible in a playful manner.</p>
+
       <p class="lead">
         The controller looks a second or two into the future, works out which cart force keeps
-        the pendulum upright at the lowest <em>cost</em>, applies it, and redoes the whole
-        calculation fifty times a second. What <em>cost</em> means is entirely up to the
-        numbers in the formula below. Edit them and watch the pendulum change its mind.
+        the pendulum upright at the lowest cost, applies it, and redoes the whole calculation
+        fifty times a second. What cost means is entirely up to the numbers in the formula
+        below. Edit them and watch the pendulum change its mind.
       </p>
-      <p class="lead cta"><b>Try it out and move your mouse next to the pole tip!</b></p>
+
+      <p class="lead">
+        In Expert mode you can access way more details and functions to change more controller
+        functionalities, plant, and reality parameters.
+      </p>
+
+      <p class="lead cta">Try it out and move your mouse next to the pole tip!</p>
     </div>
-    <button id="themeBtn" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
+
+    <!-- decorative miniature of the very thing the page is about -->
+    <div class="hero-art" aria-hidden="true">
+      <div class="hero-rig">
+        <div class="hero-head"><img id="heroRobot" alt=""></div>
+        <div class="hero-rod"></div>
+        <div class="hero-cart"><span></span><span></span></div>
+      </div>
+      <div class="hero-rail"></div>
+    </div>
   </header>
 
   <!-- ==================== 2. Die Gleichung ==================== -->
@@ -147,7 +163,7 @@
     <div class="def-cols">
 
       <div class="def-state">
-        <h2 class="card-title">What the controller is looking at</h2>
+        <h2 class="card-title">What the controller looks at, and what it penalises</h2>
         <div class="vecdef">
           <div class="vd-lhs"><math class="mf"><mrow><msub><mi>x</mi><mi>k</mi></msub><mo>=</mo></mrow></math></div>
           <div class="vd-mat">
@@ -177,10 +193,20 @@
             one kind of error more expensive than another.</span></span>
           </li>
           <li>
+            <math class="mf"><mi mathvariant="bold">Q</mi></math>
+            <span>penalises state error: how expensive each kind of deviation is. Its four
+            diagonal entries line up with the four states above.</span>
+          </li>
+          <li>
             <math class="mf"><msub><mi>u</mi><mi>k</mi></msub></math>
             <span>the horizontal force on the cart <span class="unit">[N]</span>, k steps
             from now.<span class="expert-only"> It is the only thing the controller can
             actually do — nothing pushes the rod directly.</span></span>
+          </li>
+          <li>
+            <math class="mf"><mi>R</mi></math>
+            <span>penalises expensive actuation: how much that force costs. A large R buys
+            smoothness and pays for it with speed.</span>
           </li>
           <li>
             <math class="mf"><mi>N</mi></math>
