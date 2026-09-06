@@ -34,7 +34,7 @@ Interactive browser demo of model predictive control on an inverted pendulum.
 
 `header.h1:`
 
-Inverted Pendulum on a Cart
+Robot on a stick!
 
 `header.intro:`  (the loose 2–3 sentence opener)
 
@@ -361,13 +361,13 @@ Because the only constraints are box bounds, the solver stays compact. First the
 
 The displayed solve time is genuinely measured, averaged over recent samples because browsers round their clocks to 100 µs. Typically it stays well under 0.1 ms per sample with a fixed model, and around a millisecond in nonlinear mode where the model and the Hessian are rebuilt from scratch every single step.
 
-### 9. Where this demo stops being honest [expert]
+### 9. Demo limitations [expert]
 
-`explain.where-this-demo-stops-being-.title:`
+`explain.demo-limitations.title:`
 
-Where this demo stops being honest
+Demo limitations
 
-`explain.where-this-demo-stops-being-.body:`
+`explain.demo-limitations.body:`
 
 - The full state is assumed measurable. In reality ṗ and θ̇ would be estimated from encoder readings, normally with a Kalman filter, and that estimator has dynamics of its own.
 - No swing-up from hanging: that is not a QP any more and needs genuine nonlinear optimisation or a separate energy-based controller. Nonlinear mode with a long horizon does catch the pendulum from surprisingly large angles, though.
