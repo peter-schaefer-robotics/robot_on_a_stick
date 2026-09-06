@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="doc.title">Inverses Pendel mit MPC-Regelung</title>
+<meta name="description" content="Interaktive Browser-Demonstration einer modellpraediktiven Regelung (MPC) am inversen Pendel: Q- und R-Gewichte live tunen, Stoerungen mit der Maus aufbringen.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='7' y='22' width='18' height='7' rx='2' fill='%232b8ca8'/><line x1='16' y1='22' x2='24' y2='5' stroke='%23d8dee9' stroke-width='2.5'/><circle cx='24' cy='5' r='3.5' fill='%23e0a33e'/></svg>">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <h1 data-i18n="app.title">Inverses Pendel am Wagen</h1>
+      <p class="sub" data-i18n="app.subtitle"></p>
+    </div>
+    <div class="topbar-actions">
+      <button id="themeBtn" class="icon-btn" data-i18n-title="theme.title" aria-label="Theme">◐</button>
+      <button id="langBtn" class="icon-btn wide" data-i18n="lang.toggle" data-i18n-title="lang.title">EN</button>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ================= linke Spalte: Animation und Verlaeufe ============ -->
+    <main class="col-left">
+
+      <section class="card stage-card">
+        <div class="stage-wrap">
+          <canvas id="scene"></canvas>
+          <div class="hud" id="hud">
+            <div class="hud-row"><span data-i18n="hud.angle"></span><b id="hudTheta">–</b></div>
+            <div class="hud-row"><span data-i18n="hud.pos"></span><b id="hudPos">–</b></div>
+            <div class="hud-row"><span data-i18n="hud.force"></span><b id="hudU">–</b></div>
+            <div class="hud-row"><span data-i18n="hud.dist"></span><b id="hudFd">–</b></div>
+            <div class="hud-sep"></div>
+            <div class="hud-row"><span data-i18n="hud.cost"></span><b id="hudJ">–</b></div>
+            <div class="hud-row"><span data-i18n="hud.solve"></span><b id="hudMs">–</b></div>
+            <div class="hud-row"><span data-i18n="hud.iter"></span><b id="hudIter">–</b></div>
+            <div class="hud-row status" id="hudStatus"></div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button id="playBtn" class="btn primary" data-i18n="ctrl.pause">Pause</button>
+          <button id="resetBtn" class="btn" data-i18n="ctrl.reset">Reset</button>
+          <button id="kickLeftBtn" class="btn" data-i18n="ctrl.kickLeft"></button>
+          <button id="kickRightBtn" class="btn" data-i18n="ctrl.kickRight"></button>
+          <button id="dropBtn" class="btn" data-i18n="ctrl.drop"></button>
+          <span class="spacer"></span>
+          <label class="chk"><input type="checkbox" id="showPred" checked><span data-i18n="view.prediction"></span></label>
+          <label class="chk"><input type="checkbox" id="showForces" checked><span data-i18n="view.forces"></span></label>
+          <label class="chk"><input type="checkbox" id="showTrace"><span data-i18n="view.trace"></span></label>
+        </div>
+        <p class="hint" data-i18n="ctrl.hint"></p>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="scope.title"></h2>
+        <canvas id="scope"></canvas>
+        <div class="legend">
+          <span class="lg lg-theta">&theta; [&deg;]</span>
+          <span class="lg lg-pos">p [m]</span>
+          <span class="lg lg-u">u [N]</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="scope.uplan"></h2>
+        <canvas id="uplan"></canvas>
+      </section>
+
+    </main>
+
+    <!-- ================= rechte Spalte: Formel und Regler ================= -->
+    <aside class="col-right">
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="formula.title"></h2>
+
+        <math display="block" class="eq">
+          <mrow>
+            <munder>
+              <mo movablelimits="false">min</mo>
+              <mrow><msub><mi>u</mi><mn>0</mn></msub><mo>,</mo><mo>&#8230;</mo><mo>,</mo>
+                    <msub><mi>u</mi><mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow></msub></mrow>
+            </munder>
+            <mspace width="0.35em"/>
+            <mi>J</mi><mo>=</mo>
+            <munderover>
+              <mo>&#8721;</mo>
+              <mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow>
+              <mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow>
+            </munderover>
+            <mrow>
+              <mo stretchy="true">(</mo>
+              <msubsup><mi>e</mi><mi>k</mi><mo>&#8868;</mo></msubsup><mi mathvariant="bold">Q</mi><msub><mi>e</mi><mi>k</mi></msub>
+              <mo>+</mo>
+              <mi>R</mi><msubsup><mi>u</mi><mi>k</mi><mn>2</mn></msubsup>
+              <mo stretchy="true">)</mo>
+            </mrow>
+            <mo>+</mo>
+            <msubsup><mi>e</mi><mi>N</mi><mo>&#8868;</mo></msubsup><mi mathvariant="bold">P</mi><msub><mi>e</mi><mi>N</mi></msub>
+          </mrow>
+        </math>
+
+        <p class="eq-label" data-i18n="formula.st"></p>
+        <math display="block" class="eq eq-small">
+          <mtable columnalign="left">
+            <mtr><mtd>
+              <mrow>
+                <msub><mi>x</mi><mrow><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>=</mo>
+                <msub><mi mathvariant="bold">A</mi><mi>d</mi></msub><msub><mi>x</mi><mi>k</mi></msub><mo>+</mo>
+                <msub><mi mathvariant="bold">B</mi><mi>d</mi></msub><msub><mi>u</mi><mi>k</mi></msub>
+                <mo>,</mo><mspace width="0.6em"/>
+                <msub><mi>e</mi><mi>k</mi></msub><mo>=</mo><msub><mi>x</mi><mi>k</mi></msub><mo>&#8722;</mo>
+                <msub><mi>x</mi><mi>soll</mi></msub>
+              </mrow>
+            </mtd></mtr>
+            <mtr><mtd>
+              <mrow>
+                <mrow><mo>|</mo><msub><mi>u</mi><mi>k</mi></msub><mo>|</mo></mrow><mo>&#8804;</mo>
+                <msub><mi>u</mi><mi>max</mi></msub>
+                <mo>,</mo><mspace width="0.6em"/>
+                <msub><mi>x</mi><mn>0</mn></msub><mo>=</mo><mi>x</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo>
+              </mrow>
+            </mtd></mtr>
+          </mtable>
+        </math>
+
+        <details class="legend-details">
+          <summary data-i18n="formula.legendTitle"></summary>
+          <ul class="symbol-list" id="symbolList"></ul>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="tune.title"></h2>
+
+        <div class="matrix-block">
+          <div class="matrix-head">
+            <span class="mlabel">Q =</span>
+            <div class="colnames">
+              <span>p</span><span>&#7777;</span><span>&theta;</span><span>&#952;&#775;</span>
+            </div>
+          </div>
+          <div class="matrix">
+            <div class="brk brk-l"></div>
+            <div class="mgrid">
+              <input class="qin" id="q0" type="number" step="any" inputmode="decimal">
+              <span class="z">0</span><span class="z">0</span><span class="z">0</span>
+              <span class="z">0</span>
+              <input class="qin" id="q1" type="number" step="any" inputmode="decimal">
+              <span class="z">0</span><span class="z">0</span>
+              <span class="z">0</span><span class="z">0</span>
+              <input class="qin" id="q2" type="number" step="any" inputmode="decimal">
+              <span class="z">0</span>
+              <span class="z">0</span><span class="z">0</span><span class="z">0</span>
+              <input class="qin" id="q3" type="number" step="any" inputmode="decimal">
+            </div>
+            <div class="brk brk-r"></div>
+          </div>
+        </div>
+
+        <div class="r-row">
+          <span class="mlabel">R =</span>
+          <input class="qin rin" id="rin" type="number" step="any" min="0.0001" inputmode="decimal">
+        </div>
+
+        <p class="hint small" data-i18n="tune.hint"></p>
+
+        <div class="preset-label" data-i18n="tune.preset"></div>
+        <div class="presets" id="presets"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="param.title"></h2>
+
+        <div class="field">
+          <label for="modeSel" data-i18n="param.mode"></label>
+          <select id="modeSel">
+            <option value="linear" data-i18n="param.mode.linear"></option>
+            <option value="nonlinear" data-i18n="param.mode.nonlinear"></option>
+          </select>
+        </div>
+
+        <div class="field slider">
+          <label for="Nin"><span data-i18n="param.N"></span><b id="NVal"></b></label>
+          <input type="range" id="Nin" min="5" max="80" step="1">
+        </div>
+
+        <div class="field slider">
+          <label for="Tsin"><span data-i18n="param.Ts"></span><b id="TsVal"></b></label>
+          <input type="range" id="Tsin" min="5" max="50" step="1">
+        </div>
+
+        <div class="field slider">
+          <label for="umaxin"><span data-i18n="param.umax"></span><b id="umaxVal"></b></label>
+          <input type="range" id="umaxin" min="1" max="40" step="0.5">
+        </div>
+
+        <label class="chk block"><input type="checkbox" id="termChk" checked><span data-i18n="param.terminal"></span></label>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" data-i18n="plant.title"></h2>
+
+        <div class="field slider">
+          <label for="mpin"><span data-i18n="param.mp"></span><b id="mpVal"></b></label>
+          <input type="range" id="mpin" min="0.05" max="1.5" step="0.01">
+        </div>
+        <div class="field slider">
+          <label for="Mcin"><span data-i18n="param.Mc"></span><b id="McVal"></b></label>
+          <input type="range" id="Mcin" min="0.1" max="3" step="0.01">
+        </div>
+        <div class="field slider">
+          <label for="lin"><span data-i18n="param.l"></span><b id="lVal"></b></label>
+          <input type="range" id="lin" min="0.15" max="1.2" step="0.01">
+        </div>
+        <div class="field slider">
+          <label for="bin"><span data-i18n="param.b"></span><b id="bVal"></b></label>
+          <input type="range" id="bin" min="0" max="2" step="0.01">
+        </div>
+        <div class="field slider">
+          <label for="distin"><span data-i18n="param.disturb"></span><b id="distVal"></b></label>
+          <input type="range" id="distin" min="0" max="3" step="0.05">
+        </div>
+        <div class="field slider">
+          <label for="noisein"><span data-i18n="param.noise"></span><b id="noiseVal"></b></label>
+          <input type="range" id="noisein" min="0" max="30" step="0.5">
+        </div>
+        <div class="field slider">
+          <label for="mmin"><span data-i18n="param.mismatch"></span><b id="mmVal"></b></label>
+          <input type="range" id="mmin" min="-70" max="150" step="1">
+          <span class="hint small" data-i18n="param.mismatchHint"></span>
+        </div>
+        <div class="field slider">
+          <label for="spin"><span data-i18n="param.setpoint"></span><b id="spVal"></b></label>
+          <input type="range" id="spin" min="-150" max="150" step="1">
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <!-- ===================== Erklaerung ==================================== -->
+  <section class="explain">
+    <h2 data-i18n="ex.title"></h2>
+    <div class="ex-grid">
+      <details open><summary data-i18n="ex.setup.h"></summary><div data-i18n="ex.setup.p"></div></details>
+      <details open><summary data-i18n="ex.mpc.h"></summary><div data-i18n="ex.mpc.p"></div></details>
+      <details open><summary data-i18n="ex.qr.h"></summary><div data-i18n="ex.qr.p"></div></details>
+      <details><summary data-i18n="ex.model.h"></summary><div data-i18n="ex.model.p"></div></details>
+      <details><summary data-i18n="ex.horizon.h"></summary><div data-i18n="ex.horizon.p"></div></details>
+      <details><summary data-i18n="ex.constraints.h"></summary><div data-i18n="ex.constraints.p"></div></details>
+      <details><summary data-i18n="ex.disturb.h"></summary><div data-i18n="ex.disturb.p"></div></details>
+      <details><summary data-i18n="ex.numerics.h"></summary><div data-i18n="ex.numerics.p"></div></details>
+      <details><summary data-i18n="ex.limits.h"></summary><div data-i18n="ex.limits.p"></div></details>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span data-i18n="foot.note"></span>
+  </footer>
+</div>
+
+<!-- Formelbausteine, die in die Erklaerungstexte eingesetzt werden -->
+<template id="eq-model">
+  <math display="block" class="eq eq-small">
+    <mtable columnalign="right center left">
+      <mtr>
+        <mtd><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover></mtd>
+        <mtd><mo>=</mo></mtd>
+        <mtd>
+          <mfrac>
+            <mrow>
+              <mi>u</mi><mo>&#8722;</mo><mi>b</mi><mover accent="true"><mi>p</mi><mo>&#775;</mo></mover>
+              <mo>+</mo><mi>m</mi><mi>l</mi><msup><mover accent="true"><mi>&#952;</mi><mo>&#775;</mo></mover><mn>2</mn></msup><mi>sin</mi><mi>&#952;</mi>
+              <mo>&#8722;</mo><mi>m</mi><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mi>cos</mi><mi>&#952;</mi>
+            </mrow>
+            <mrow><mi>M</mi><mo>+</mo><mi>m</mi><msup><mi>sin</mi><mn>2</mn></msup><mi>&#952;</mi></mrow>
+          </mfrac>
+        </mtd>
+      </mtr>
+      <mtr>
+        <mtd><mover accent="true"><mi>&#952;</mi><mo>&#168;</mo></mover></mtd>
+        <mtd><mo>=</mo></mtd>
+        <mtd>
+          <mfrac>
+            <mrow><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mo>&#8722;</mo><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover><mi>cos</mi><mi>&#952;</mi></mrow>
+            <mi>l</mi>
+          </mfrac>
+        </mtd>
+      </mtr>
+    </mtable>
+  </math>
+</template>
+
+<template id="eq-qp">
+  <math display="block" class="eq eq-small">
+    <mrow>
+      <munder><mo movablelimits="false">min</mo><mi mathvariant="bold">U</mi></munder>
+      <mspace width="0.35em"/>
+      <mfrac><mn>1</mn><mn>2</mn></mfrac>
+      <msup><mi mathvariant="bold">U</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">H</mi><mi mathvariant="bold">U</mi>
+      <mo>+</mo>
+      <msup><mi mathvariant="bold">g</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">U</mi>
+      <mo>,</mo><mspace width="0.8em"/>
+      <mi mathvariant="bold">H</mi><mo>=</mo><mn>2</mn>
+      <mo stretchy="false">(</mo><msup><mi mathvariant="bold">&#915;</mi><mo>&#8868;</mo></msup>
+      <mover accent="true"><mi mathvariant="bold">Q</mi><mo>&#175;</mo></mover>
+      <mi mathvariant="bold">&#915;</mi><mo>+</mo><mi>R</mi><mi mathvariant="bold">I</mi><mo stretchy="false">)</mo>
+    </mrow>
+  </math>
+</template>
+
+<script src="js/linalg.js"></script>
+<script src="js/model.js"></script>
+<script src="js/mpc.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
