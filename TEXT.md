@@ -122,7 +122,7 @@ Two buttons side by side, each with a label and a subtitle. The labels live in
 `mode.beatnote:`  [beat]  (the box under the buttons — this is what tells the user to
 drag the cart)
 
-**You are the controller now — click anywhere in the scene and drag left or right to pull the cart.** That is your only handle, and you get the same 15 N limit the MPC has. The rod starts perfectly upright and can no longer be pushed; it stays up until you move. Everything runs at **half speed**, because at full speed human reaction time loses this game in about three seconds. The clock still counts simulated seconds.
+**You are the controller now — click anywhere in the scene and drag left or right to pull the cart, or hold the arrow keys.** That is your only handle, and you get the same 15 N limit the MPC has. The rod starts perfectly upright and can no longer be pushed; it stays up until you move. Everything runs at **half speed**, because at full speed human reaction time loses this game in about three seconds. The clock still counts simulated seconds.
 
 ## 7 · Animation
 

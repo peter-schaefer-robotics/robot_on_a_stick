@@ -25,11 +25,11 @@ python3 -m http.server 8000
 
 Tested in current Chrome, Firefox, Safari and Edge, on desktop and mobile.
 
-## Beat the Controller
+## Beat the controller
 
 A second button next to the mode switch turns the MPC off and hands the cart to you: click
-anywhere in the scene and drag to pull it left or right, through a spring-damper that is
-clipped to the same 15 N the controller gets. The rod starts perfectly upright, cannot be
+anywhere in the scene and drag to pull it left or right — or hold the arrow keys — through a
+spring-damper that is clipped to the same 15 N the controller gets. The rod starts perfectly upright, cannot be
 pushed any more, and stays up until you move. A clock counts how long you keep it within 60°,
 and remembers your best run.
 
@@ -69,7 +69,8 @@ uses the more common combination: a shorter horizon plus the Riccati terminal we
 | --- | --- |
 | Mouse near the robot head | pushes the pendulum (horizontal force on the pendulum mass) |
 | Click on the scene | sets the cart's target position |
-| Click and drag (Beat the Controller) | pulls the cart yourself |
+| Click and drag (Beat the controller) | pulls the cart yourself |
+| Arrow keys (Beat the controller) | move the cart with the keyboard |
 | Q and R fields | change the weights — takes effect immediately |
 | Space | pause / resume |
 | `R` | reset |

@@ -122,13 +122,18 @@ body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 .lead em { color: var(--fg); font-style: normal; font-weight: 600; }
 .lead.cta {
   margin-top: 16px; color: var(--fg); font-weight: 600;
-  display: inline-flex; align-items: baseline; gap: 9px;
+  display: inline-block;
   border-left: 3px solid var(--accent); padding: 2px 0 2px 12px;
 }
-.lead.cta::before { content: "→"; color: var(--accent); font-weight: 700; }
-.lead.cta a { color: inherit; text-decoration: none; }
+/* the arrow belongs to the link, so the whole thing is one click target */
+.lead.cta a {
+  color: inherit; text-decoration: none;
+  display: inline-flex; align-items: baseline; gap: 9px;
+}
+.lead.cta a::before { content: "→"; color: var(--accent); font-weight: 700; }
 .lead.cta:hover { border-left-color: var(--accent-2); }
 .lead.cta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.lead.cta a:hover::before { text-decoration: none; }
 
 /* the invitation in the hero jumps to the buttons and the animation */
 #playground { scroll-margin-top: 18px; }

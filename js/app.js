@@ -22,7 +22,7 @@
   var MOUSE_RADIUS = 0.32;     // radius of influence of the pointer [m]
   var LS = 'ipm-mpc:';
 
-  // "Beat the Controller": the pointer pulls the cart through a spring-damper,
+  // "Beat the controller": the pointer pulls the cart through a spring-damper,
   // so the user drives the very same force input the MPC would - including its
   // bound. Dragging the cart to a position directly would allow infinite force
   // and make the comparison meaningless.
@@ -71,7 +71,13 @@
 
   var uiMode = 'simple';
   var playMode = 'mpc';        // 'mpc' | 'manual'
-  var drag = { active: false, x: 0, grab: 0 };
+  var drag = { active: false, x: 0, grab: 0, byPointer: false };
+  var keys = { left: false, right: false };
+  var KEY_SPEED = 2.0;         // how fast the arrow keys move the grip [m/s]
+  // How far the grip may run ahead of the cart. 0.2 m keeps the input bound
+  // saturated up to about 1 m/s of cart speed, so holding a key actually moves
+  // the cart instead of settling at a crawl.
+  var KEY_REACH = 0.2;
   var beat = { running: false, t: 0, best: 0, failed: false };
   var pAuto = true;
   var pCells = [];
@@ -134,6 +140,8 @@
     playMode = m;
     document.body.setAttribute('data-play', m);
     drag.active = false;
+    drag.byPointer = false;
+    keys.left = keys.right = false;
     $('scene').classList.remove('grabbing');
     beat.running = false;
     beat.failed = false;
@@ -150,6 +158,14 @@
       $('hudStatus').className = 'hud-row status';
     }
     $('playModeBtn').blur();
+  }
+
+  /** Pointer or arrow keys - either one drives the cart. */
+  function updateDragActive() {
+    var wanted = drag.byPointer || keys.left || keys.right;
+    if (wanted && !drag.active) drag.x = sim.s[0];   // start with zero force
+    drag.active = wanted;
+    if (!wanted) { keys.left = keys.right = false; }
   }
 
   /** Force the user commands while dragging: a spring-damper on the cart. */
@@ -169,7 +185,7 @@
 
     var manual = playMode === 'manual';
     $('playModeBtn').querySelector('.mode-btn-label').textContent =
-      manual ? 'Give me the controller back' : 'Beat the Controller';
+      manual ? 'Give me the controller back' : 'Beat the controller';
     $('playModeBtn').querySelector('.mode-btn-sub').textContent = manual
       ? 'hand the cart back to the MPC'
       : 'switch the controller off and balance the rod yourself';
@@ -409,7 +425,9 @@
     });
 
     $('playBtn').addEventListener('click', function () { sim.running = !sim.running; updatePlayLabel(); });
-    $('resetBtn').addEventListener('click', function () { reset(0.08); });
+    $('resetBtn').addEventListener('click', function () {
+      reset(playMode === 'manual' ? 0 : 0.08);
+    });
     $('kickLeftBtn').addEventListener('click', function () { kick(-1); });
     $('kickRightBtn').addEventListener('click', function () { kick(1); });
     $('modeBtn').addEventListener('click', function () {
@@ -426,14 +444,38 @@
     document.addEventListener('keydown', function (e) {
       if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       if (e.code === 'Space') { e.preventDefault(); sim.running = !sim.running; updatePlayLabel(); }
-      else if (e.key === 'r' || e.key === 'R') reset(0.08);
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); kick(-1); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); kick(1); }
+      else if (e.key === 'r' || e.key === 'R') reset(playMode === 'manual' ? 0 : 0.08);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        var right = e.key === 'ArrowRight';
+        if (playMode === 'manual') {
+          keys[right ? 'right' : 'left'] = true;
+          updateDragActive();
+        } else {
+          kick(right ? 1 : -1);
+        }
+      }
+    });
+
+    document.addEventListener('keyup', function (e) {
+      if (e.key === 'ArrowLeft') keys.left = false;
+      else if (e.key === 'ArrowRight') keys.right = false;
+      else return;
+      updateDragActive();
+    });
+    // A key can get stuck if focus leaves the page while it is held.
+    root.addEventListener('blur', function () {
+      keys.left = keys.right = false;
+      updateDragActive();
     });
 
     var scene = $('scene');
     var leave = function () { mouse.inside = false; mouse.active = false; mouse.vx = 0; };
-    var endDrag = function () { drag.active = false; scene.classList.remove('grabbing'); };
+    var endDrag = function () {
+      drag.byPointer = false;
+      updateDragActive();
+      scene.classList.remove('grabbing');
+    };
     scene.addEventListener('pointermove', onPointerMove);
     scene.addEventListener('pointerleave', function () { leave(); endDrag(); });
     scene.addEventListener('pointerup', function (e) {
@@ -446,9 +488,10 @@
       if (playMode === 'manual') {
         // Relative dragging: remember where the cart was grabbed, so the pull
         // starts at zero force no matter where in the scene the click lands.
-        drag.active = true;
+        drag.byPointer = true;
         drag.grab = toWorld(e).x - sim.s[0];
         drag.x = sim.s[0];
+        updateDragActive();
         scene.classList.add('grabbing');
         if (scene.setPointerCapture) { try { scene.setPointerCapture(e.pointerId); } catch (err) {} }
         e.preventDefault();
@@ -485,6 +528,7 @@
   }
 
   function kick(dir) {
+    if (playMode === 'manual') return;   // the rod may not be pushed here
     // Short impulse, scaled by the weight of the ball.
     sim.fdKick = dir * 2.5 * plant.mp * plant.g;
     sim.kickTimer = 0.08;
@@ -506,7 +550,7 @@
     var now = performance.now();
     var pt = toWorld(e);
     if (playMode === 'manual') {
-      if (drag.active) drag.x = pt.x - drag.grab;
+      if (drag.byPointer) drag.x = pt.x - drag.grab;
       return;
     }
     var dt = (now - lastPointerT) / 1000;
@@ -569,6 +613,13 @@
     var guard = 0;
     while (acc >= h && guard++ < 600) {
       if (playMode === 'manual') {
+        if (keys.left || keys.right) {
+          // The grip runs ahead of the cart and is capped at the distance where
+          // the spring already saturates the input bound, so a short tap gives
+          // a small push and holding the key gives everything there is.
+          drag.x += ((keys.right ? 1 : 0) - (keys.left ? 1 : 0)) * KEY_SPEED * h;
+          drag.x = clamp(drag.x, sim.s[0] - KEY_REACH, sim.s[0] + KEY_REACH);
+        }
         sim.u = manualForce();
         if (drag.active && !beat.running && !beat.failed) beat.running = true;
         if (beat.running) {
@@ -717,7 +768,7 @@
     IPM.app = {
       sim: sim, ctrl: ctrl, opts: opts, plant: plant, hist: hist, mouse: mouse,
       reset: reset, kick: kick, setMode: setMode, setTheme: setTheme,
-      setPlayMode: setPlayMode, beat: beat, drag: drag, step: stepSim,
+      setPlayMode: setPlayMode, beat: beat, drag: drag, keys: keys, step: stepSim,
       result: function () { return lastRes; }
     };
 
