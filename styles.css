@@ -459,7 +459,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); height: 22px; ma
 }
 
 /* embedding: ?embed=1 hides heading, explanations and footer */
-body.embed .topbar,
+body.embed .hero,
 body.embed .explain,
 body.embed .foot { display: none; }
 body.embed .app { padding: 0; max-width: none; }
@@ -483,7 +483,14 @@ body.embed .app { padding: 0; max-width: none; }
   .hero { padding: 20px 18px; border-radius: 14px; }
   .kicker { font-size: 19px; }
   .lead { font-size: 16px; }
-  #scene { aspect-ratio: 4 / 3; }
+  /* The animation is the point of the page, so on a phone it runs edge to edge
+     and squarer, which buys both width for the track and height for the rod. */
+  .stage-card {
+    margin-left: -13px; margin-right: -13px;
+    border-left: 0; border-right: 0; border-radius: 0;
+    padding: 10px;
+  }
+  #scene { aspect-ratio: 6 / 5; max-height: 58vh; border-radius: 8px; }
   .cell { width: 34px; height: 25px; font-size: 11.5px; }
   .cell.ro { font-size: 10px; }
   .mx-head { font-size: 10.5px; padding: 0 8px; gap: 3px; }

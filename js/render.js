@@ -110,7 +110,10 @@
   function drawScene(canvas, v) {
     var f = fit(canvas), ctx = f.ctx, w = f.w, h = f.h;
     var C = colors;
-    var viewW = Math.max(2.2, 2.6 * Math.max(0.7, Math.min(1.4, w / 900)));
+    // Narrow canvases zoom in further: on a phone the visible track matters
+    // less than seeing the cart and the rod properly.
+    var minView = w < 430 ? 1.7 : 2.2;
+    var viewW = Math.max(minView, 2.6 * Math.max(0.7, Math.min(1.4, w / 900)));
     var scale = w / viewW;
     var groundY = h * 0.76;
     var camX = v.camX || 0;
