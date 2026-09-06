@@ -1,8 +1,7 @@
 /*
- * Minimale Matrix-Bibliothek fuer die MPC-Demo.
- * Matrizen: { r, c, d } mit d als Float64Array in row-major Reihenfolge.
- * Bewusst klein gehalten - es werden nur die Operationen implementiert,
- * die der Regler wirklich braucht.
+ * Minimal matrix library for the MPC demo.
+ * A matrix is { r, c, d } with d a Float64Array in row-major order.
+ * Deliberately small: only the operations the controller actually needs.
  */
 (function (root) {
   'use strict';
@@ -32,7 +31,7 @@
   }
 
   function mul(A, B) {
-    if (A.c !== B.r) throw new Error('mul: Dimensionsfehler ' + A.c + ' vs ' + B.r);
+    if (A.c !== B.r) throw new Error('mul: dimension mismatch ' + A.c + ' vs ' + B.r);
     var C = mat(A.r, B.c), i, k, j, a;
     for (i = 0; i < A.r; i++) {
       for (k = 0; k < A.c; k++) {
@@ -44,7 +43,7 @@
     return C;
   }
 
-  /** y = A * x, x als einfaches Array/Float64Array. */
+  /** y = A * x, with x a plain Array or Float64Array. */
   function mulVec(A, x) {
     var y = new Float64Array(A.r), i, j, s;
     for (i = 0; i < A.r; i++) {
@@ -81,7 +80,7 @@
     return C;
   }
 
-  /** Groesste absolute Zeilensumme (Unendlich-Norm). */
+  /** Largest absolute row sum (infinity norm). */
   function normInf(A) {
     var best = 0, i, j, s;
     for (i = 0; i < A.r; i++) {
@@ -102,9 +101,9 @@
   }
 
   /**
-   * Matrix-Exponential exp(A) ueber "scaling and squaring" mit Taylorreihe.
-   * Genau genug fuer die kleinen (6x6) Systemmatrizen hier und ohne
-   * externe Abhaengigkeit.
+   * Matrix exponential exp(A) by scaling and squaring with a Taylor series.
+   * Accurate enough for the small (6x6) system matrices used here, and free
+   * of any external dependency.
    */
   function expm(A) {
     var n = A.r;
@@ -123,7 +122,7 @@
     return result;
   }
 
-  /** Untermatrix [r0, r1) x [c0, c1). */
+  /** Submatrix [r0, r1) x [c0, c1). */
   function block(A, r0, r1, c0, c1) {
     var C = mat(r1 - r0, c1 - c0);
     for (var i = r0; i < r1; i++) {

@@ -1,49 +1,49 @@
 ---
 /**
- * Einbettung der MPC-Pendel-Demo in eine Astro-Seite.
+ * Embeds the MPC pendulum playground in an Astro page.
  *
- * Voraussetzung: Der Inhalt des Demo-Repos liegt unter `public/pendulum/`
- * (also `public/pendulum/index.html`, `public/pendulum/styles.css`,
- * `public/pendulum/js/...`). Alles unter `public/` wird von Astro unveraendert
- * ausgeliefert - es findet keine Buendelung statt, was hier genau richtig ist.
+ * Prerequisite: the contents of the demo repo live under `public/pendulum/`
+ * (that is, `public/pendulum/index.html`, `public/pendulum/styles.css`,
+ * `public/pendulum/js/...`). Anything under `public/` is served verbatim by
+ * Astro with no bundling, which is exactly what is wanted here.
  *
- * Verwendung:
+ * Usage:
  *   ---
  *   import InvertedPendulumMpc from '../components/InvertedPendulumMpc.astro';
  *   ---
- *   <InvertedPendulumMpc lang="de" embed={true} height="820px" />
+ *   <InvertedPendulumMpc mode="simple" embed={true} height="900px" />
  */
 export interface Props {
-  /** Sprache der Oberflaeche. */
-  lang?: 'de' | 'en';
-  /** Farbschema. Ohne Angabe entscheidet die Demo selbst (System / gespeichert). */
+  /** Mode the demo starts in. */
+  mode?: 'simple' | 'expert';
+  /** Colour scheme. Without it the demo decides for itself (system / stored). */
   theme?: 'dark' | 'light';
-  /** true blendet Kopfzeile, Erklaerungstexte und Fusszeile aus. */
+  /** true hides the heading, the explanations and the footer. */
   embed?: boolean;
-  /** Hoehe des Rahmens, z. B. "820px" oder "80vh". */
+  /** Height of the frame, e.g. "900px" or "85vh". */
   height?: string;
-  /** Pfad unterhalb von public/, falls abweichend abgelegt. */
+  /** Path below public/, if you put the files somewhere else. */
   path?: string;
-  /** Titel des iframes (Barrierefreiheit). */
+  /** Title of the iframe (accessibility). */
   title?: string;
 }
 
 const {
-  lang = 'de',
+  mode = 'simple',
   theme,
   embed = true,
-  height = '820px',
+  height = '900px',
   path = 'pendulum/',
-  title = 'Inverses Pendel mit MPC-Regelung',
+  title = 'Inverted pendulum with MPC control',
 } = Astro.props;
 
-// BASE_URL beachten, damit der Pfad auch bei einem gesetzten `base`
-// (typisch fuer GitHub Pages unter /reponame/) stimmt.
+// Respect BASE_URL so the path also works with a `base` set in
+// astro.config.mjs — typical for GitHub Pages serving from /reponame/.
 const base = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : import.meta.env.BASE_URL + '/';
 
-const params = new URLSearchParams({ lang });
+const params = new URLSearchParams({ mode });
 if (theme) params.set('theme', theme);
 if (embed) params.set('embed', '1');
 
@@ -62,7 +62,7 @@ const src = `${base}${path}index.html?${params.toString()}`;
 <style>
   .ipm-embed {
     width: 100%;
-    height: var(--ipm-height, 820px);
+    height: var(--ipm-height, 900px);
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid rgba(128, 128, 128, 0.25);
@@ -73,9 +73,9 @@ const src = `${base}${path}index.html?${params.toString()}`;
     border: 0;
     display: block;
   }
-  /* Auf kleinen Displays braucht die Demo mehr Hoehe, weil das Bedienfeld
-     unter die Animation rutscht. */
+  /* On narrow screens the demo needs more height, because the controls move
+     below the animation and the formula wraps onto several lines. */
   @media (max-width: 700px) {
-    .ipm-embed { height: calc(var(--ipm-height, 820px) + 260px); }
+    .ipm-embed { height: calc(var(--ipm-height, 900px) + 300px); }
   }
 </style>

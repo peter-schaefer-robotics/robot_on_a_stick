@@ -1,57 +1,56 @@
 /*
- * Modellpraediktive Regelung (MPC) in "condensed" (dichter) Form
- * fuer das Cart-Pole-System.
+ * Model predictive control (MPC) in condensed (dense) form for the cart-pole.
  *
- * In jedem Regeltakt geloestes Optimierungsproblem:
+ * Optimization problem solved at every control step:
  *
  *   min_U  sum_{k=0}^{N-1} (x_k - x_ref)' Q (x_k - x_ref) + R u_k^2
  *          + (x_N - x_ref)' P (x_N - x_ref)
- *   s.t.   x_{k+1} = Ad_k x_k + Bd_k u_k + cd_k     (Praediktionsmodell)
- *          |u_k| <= u_max                           (Stellgroessengrenze)
- *          x_0 = x(t)                               (aktueller Zustand)
+ *   s.t.   x_{k+1} = Ad_k x_k + Bd_k u_k + cd_k     (prediction model)
+ *          |u_k| <= u_max                           (input bound)
+ *          x_0 = x(t)                               (current state)
  *
- * Zwei Praediktionsmodelle stehen zur Wahl:
+ * Two prediction models are available:
  *
- *   'linear'    Einmalige Linearisierung um die aufrechte Ruhelage. Das
- *               klassische lineare MPC: Ad, Bd, H sind konstant und werden
- *               nur bei Parameteraenderung neu gebaut.
- *   'nonlinear' Real-Time-Iteration (SQP mit einer Iteration pro Takt): die
- *               letzte Loesung wird durch das *nichtlineare* Modell vorwaerts
- *               simuliert und an jedem Punkt dieser Trajektorie neu
- *               linearisiert. Ergebnis ist ein zeitvariantes (LTV) Modell,
- *               das auch bei grossen Auslenkungen gilt.
+ *   'linear'    A single linearisation about the upright equilibrium. This is
+ *               classic linear MPC: Ad, Bd and H are constant and are only
+ *               rebuilt when a parameter changes.
+ *   'nonlinear' Real-time iteration (SQP with one iteration per step): the
+ *               previous solution is simulated forward through the *nonlinear*
+ *               model and the system is re-linearised at every point along
+ *               that trajectory, giving a linear time-varying model that stays
+ *               valid at large deflections.
  *
- * Loesungsweg:
- *  1) Der affine Term cd wird ueber den erweiterten Zustand z = [x; 1]
- *     eingebettet, damit die Praediktion rein linear bleibt.
- *  2) Elimination der Zustaende: X = Phi z_0 + Gamma U. Uebrig bleibt ein
- *     box-beschraenktes QP in U (N Variablen):
+ * How it is solved:
+ *  1) The affine term cd is embedded via the augmented state z = [x; 1] so the
+ *     prediction stays purely linear.
+ *  2) Eliminating the states gives X = Phi z_0 + Gamma U, leaving a
+ *     box-constrained QP in U (N variables):
  *        min_U 1/2 U' H U + g' U + const,   -u_max <= U <= u_max
  *        H = 2 (Gamma' Qbar Gamma + R I),  g = 2 Gamma' Qbar (Phi z_0 - Xref)
- *  3) Zuerst wird die unbeschraenkte Loesung exakt ueber eine
- *     Cholesky-Zerlegung von H bestimmt. Liegt sie in der Box, ist sie bereits
- *     das Optimum. Andernfalls dient sie geklippt als Startpunkt fuer einen
- *     projizierten Koordinatenabstieg, der die aktive Menge findet.
- *  4) Angewendet wird nur u_0, im naechsten Takt beginnt alles von vorn
- *     (receding horizon).
+ *  3) The unconstrained solution is computed exactly from a Cholesky
+ *     factorisation of H. If it lies inside the box it already is the optimum;
+ *     otherwise it is clipped and used to start a projected coordinate descent
+ *     that identifies the active set.
+ *  4) Only u_0 is applied; at the next step everything restarts (receding
+ *     horizon).
  */
 (function (root) {
   'use strict';
 
   var IPM = root.IPM = root.IPM || {};
   var LA = IPM.linalg;
-  var NX = 4;   // Zustandsdimension
-  var NZ = 5;   // erweiterter Zustand z = [x; 1]
+  var NX = 4;   // state dimension
+  var NZ = 5;   // augmented state z = [x; 1]
 
   var now = (root.performance && root.performance.now)
     ? function () { return root.performance.now(); }
     : function () { return Date.now(); };
 
   /**
-   * Exakte Diskretisierung von x_dot = A x + B u + c mit Halteglied nullter
-   * Ordnung ueber das Matrix-Exponential des aufgeblasenen Systems
+   * Exact zero-order-hold discretisation of x_dot = A x + B u + c via the
+   * matrix exponential of the augmented system
    *   S = [[A, c, B], [0, 0, 0], [0, 0, 0]],   exp(S*Ts).
-   * Liefert Ad ((n+1)x(n+1)) fuer z = [x;1] und Bd ((n+1)x1).
+   * Returns Ad ((n+1)x(n+1)) for z = [x;1] and Bd ((n+1)x1).
    */
   function discretize(A, B, c, Ts) {
     var S = LA.mat(NX + 2, NX + 2);
@@ -69,17 +68,17 @@
   }
 
   /**
-   * Diskrete algebraische Riccati-Gleichung (Wertiteration).
-   * Ein Eingang => R + B'PB ist skalar, es wird kein Gleichungsloeser
-   * gebraucht. P ist das Terminalgewicht und approximiert die Restkosten
-   * hinter dem Horizont (unendlicher LQR).
+   * Discrete algebraic Riccati equation, solved by value iteration.
+   * With a single input, R + B'PB is a scalar, so no linear solver is needed.
+   * P is the terminal weight and approximates the remaining cost beyond the
+   * horizon (the infinite-horizon LQR).
    */
   function dare(Ad, Bd, q, R, P0) {
     var n = NX, i, j, k, m, it;
     var P = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
     var Pn = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
     for (i = 0; i < n; i++) P[i][i] = q[i];
-    if (P0) { for (i = 0; i < n; i++) for (j = 0; j < n; j++) P[i][j] = P0[i][j]; }
+    if (P0) { for (i = 0; i < n; i++) for (j = 0; j < n; j++) P[i][j] = P0[i][j]; }   // warm start
 
     var PB = new Float64Array(n), AtPB = new Float64Array(n);
     var PA = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
@@ -127,7 +126,7 @@
     return P;
   }
 
-  /** Cholesky-Zerlegung H = L L' (unteres Dreieck), null wenn nicht pos. definit. */
+  /** Cholesky factorisation H = L L' (lower triangle); null if not pos. definite. */
   function cholesky(H, N) {
     var L = new Float64Array(N * N), i, j, k;
     for (i = 0; i < N; i++) {
@@ -145,7 +144,7 @@
     return L;
   }
 
-  /** Loest L L' x = b (in-place in x). */
+  /** Solves L L' x = b (in place in x). */
   function cholSolve(L, b, x, N) {
     var i, k, s;
     for (i = 0; i < N; i++) {
@@ -163,12 +162,13 @@
 
   function MpcController(cfg) {
     this.cfg = {
-      N: 40,             // Praediktionshorizont [Schritte]
-      Ts: 0.02,          // Regeltakt [s]
+      N: 40,             // prediction horizon [steps]
+      Ts: 0.02,          // control period [s]
       q: [10, 1, 100, 10],
       R: 0.5,
-      umax: 15,          // Stellgroessengrenze [N]
-      terminal: true,    // Terminalgewicht P aus DARE
+      umax: 15,          // input bound [N]
+      terminal: true,    // include the terminal weight P
+      Pdiag: null,       // null = P from the DARE, otherwise a manual diagonal
       mode: 'linear',    // 'linear' | 'nonlinear'
       maxSweeps: 120,
       tolRel: 1e-5
@@ -185,14 +185,24 @@
       if (!Object.prototype.hasOwnProperty.call(cfg, k)) continue;
       if (k === 'plant') Object.assign(this.plant, cfg.plant);
       else if (k === 'q') this.cfg.q = cfg.q.slice();
+      else if (k === 'Pdiag') this.cfg.Pdiag = cfg.Pdiag ? cfg.Pdiag.slice() : null;
       else this.cfg[k] = cfg[k];
     }
     this.dirty = true;
   };
 
-  /** Terminalgewicht: LQR-Loesung fuer das um die Ruhelage linearisierte Modell. */
+  /**
+   * Terminal weight: either the LQR solution for the model linearised about
+   * the upright equilibrium (default), or a hand-supplied diagonal.
+   */
   MpcController.prototype.rebuildTerminal = function () {
     if (!this.cfg.terminal) { this.Pterm = null; return; }
+    if (this.cfg.Pdiag) {
+      var Pm = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+      for (var d = 0; d < NX; d++) Pm[d][d] = this.cfg.Pdiag[d];
+      this.Pterm = Pm;
+      return;
+    }
     var lin = IPM.model.linearizeUpright(this.plant);
     var dis = discretize(lin.A, lin.B, lin.c, this.cfg.Ts);
     var Ann = [], Bnn = new Float64Array(NX), i, j;
@@ -223,8 +233,8 @@
   };
 
   /**
-   * Praediktionsmatrizen Phi, Gamma und die Hesse-Matrix H aufbauen.
-   * state wird nur im nichtlinearen Modus gebraucht (Linearisierungspunkt).
+   * Build the prediction matrices Phi, Gamma and the Hessian H.
+   * state is only needed in nonlinear mode (as the linearisation point).
    */
   MpcController.prototype.build = function (state) {
     var cfg = this.cfg, N = cfg.N, n = NX;
@@ -232,11 +242,11 @@
     var Phi = this.Phi, Gam = this.Gam;
     var i, j, k, r, c;
 
-    // --- 1) Linearisierungen bestimmen -------------------------------------
-    var steps = [];   // je Schritt { Ad, Bd }
+    // --- 1) determine the linearisations -----------------------------------
+    var steps = [];   // { Ad, Bd } per step
     if (cfg.mode === 'nonlinear') {
-      // Referenztrajektorie: letzte Loesung durch das nichtlineare Modell
-      // vorwaerts simulieren und an jedem Punkt neu linearisieren (RTI/SQP).
+      // Reference trajectory: simulate the previous solution forward through
+      // the nonlinear model and re-linearise at every point (RTI/SQP).
       var s = state.slice();
       for (k = 0; k < N; k++) {
         var uk = this.Uprev[k];
@@ -253,9 +263,9 @@
     }
     this.steps = steps;
 
-    // --- 2) Phi und Gamma rekursiv aufbauen --------------------------------
-    // Phi_k = C * Ad_k ... Ad_0 ;  Gamma-Blockzeile k aus
-    //   Gz_k = Ad_k * Gz_{k-1},  Spalte k := Bd_k
+    // --- 2) build Phi and Gamma recursively --------------------------------
+    // Phi_k = C * Ad_k ... Ad_0 ;  Gamma block row k from
+    //   Gz_k = Ad_k * Gz_{k-1},  column k := Bd_k
     var Pz = LA.eye(NZ);
     var gz = this.gz, gzT = this.gzTmp;
     gz.fill(0);
@@ -265,7 +275,7 @@
       for (r = 0; r < n; r++) {
         for (c = 0; c < NZ; c++) Phi[(k * n + r) * NZ + c] = Pz.d[r * NZ + c];
       }
-      // gzT = Ad * gz  (nur Spalten 0..k-1 belegt)
+      // gzT = Ad * gz  (only columns 0..k-1 are populated)
       for (r = 0; r < NZ; r++) {
         for (j = 0; j < k; j++) {
           var sacc = 0;
@@ -317,7 +327,7 @@
     this.dirty = false;
   };
 
-  /** Einen Regeltakt rechnen. state: aktueller Zustand, xref: Sollzustand. */
+  /** Run one control step. state: current state, xref: target state. */
   MpcController.prototype.step = function (state, xref) {
     var t0 = now();
     var cfg = this.cfg, N = cfg.N, n = NX;
@@ -359,7 +369,7 @@
       }
     }
 
-    // --- QP loesen ---------------------------------------------------------
+    // --- solve the QP ------------------------------------------------------
     var lo = -cfg.umax, hi = cfg.umax;
     var U = this.Uprev, Uunc = this.Uunc;
     var sweeps = 0, maxDelta = 0, unconstrained = false;
@@ -373,13 +383,13 @@
       }
       for (i = 0; i < N; i++) U[i] = Uunc[i] < lo ? lo : (Uunc[i] > hi ? hi : Uunc[i]);
     } else {
-      // Fallback ohne Cholesky: verschobene Vorloesung als Startwert
+      // fallback without Cholesky: shifted previous solution as the start
       for (i = 0; i < N - 1; i++) U[i] = U[i + 1];
       for (i = 0; i < N; i++) U[i] = U[i] < lo ? lo : (U[i] > hi ? hi : U[i]);
     }
 
     if (!unconstrained) {
-      // Residuum res = H U + g, dann projizierter Koordinatenabstieg.
+      // residual res = H U + g, then projected coordinate descent
       var res = this.resid;
       for (i = 0; i < N; i++) {
         var rs = g[i];
@@ -405,7 +415,7 @@
       }
     }
 
-    // Kostenwert J = 1/2 U'HU + g'U + const
+    // cost J = 1/2 U'HU + g'U + const
     var J = Jconst;
     for (i = 0; i < N; i++) {
       var hu = 0;
@@ -413,7 +423,7 @@
       J += 0.5 * U[i] * hu + g[i] * U[i];
     }
 
-    // Praedizierte Zustandsfolge X = Phi z0 + Gamma U (fuer die Visualisierung)
+    // predicted state sequence X = Phi z0 + Gamma U (for the visualisation)
     var X = this.Xpred;
     for (k = 0; k < N; k++) {
       for (r = 0; r < n; r++) {
@@ -423,7 +433,7 @@
       }
     }
 
-    // Kopie: U wird gleich fuer den Warmstart verschoben.
+    // copy: U is about to be shifted for the warm start
     this.Uout.set(U);
     var result = {
       u: U[0],
@@ -437,7 +447,7 @@
       ms: now() - t0
     };
 
-    // Warmstart fuer den naechsten Takt: Loesung um einen Schritt verschieben.
+    // warm start for the next step: shift the solution by one sample
     this.shifted = true;
     var last = U[N - 1];
     for (i = 0; i < N - 1; i++) U[i] = U[i + 1];

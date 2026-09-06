@@ -1,326 +1,605 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title data-i18n="doc.title">Inverses Pendel mit MPC-Regelung</title>
-<meta name="description" content="Interaktive Browser-Demonstration einer modellpraediktiven Regelung (MPC) am inversen Pendel: Q- und R-Gewichte live tunen, Stoerungen mit der Maus aufbringen.">
+<title>Inverted Pendulum — MPC Playground</title>
+<meta name="description" content="Interactive browser demo of model predictive control on an inverted pendulum: edit the Q and R weight matrices inside the cost function and watch the effect immediately.">
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='7' y='22' width='18' height='7' rx='2' fill='%232b8ca8'/><line x1='16' y1='22' x2='24' y2='5' stroke='%23d8dee9' stroke-width='2.5'/><circle cx='24' cy='5' r='3.5' fill='%23e0a33e'/></svg>">
 </head>
-<body>
+<body data-mode="simple">
 
 <div class="app">
 
+  <!-- ==================== 1. Kopf und Einleitung ==================== -->
   <header class="topbar">
     <div class="brand">
-      <h1 data-i18n="app.title">Inverses Pendel am Wagen</h1>
-      <p class="sub" data-i18n="app.subtitle"></p>
+      <h1>Inverted Pendulum on a Cart</h1>
+      <p class="lead">
+        Balancing a stick on your palm is easy — you feel it tip and you move your hand.
+        This page does the same thing with maths: a controller looks a second or two into the
+        future, works out which cart force keeps the pendulum upright at the lowest
+        <em>cost</em>, applies it, and redoes the whole calculation fifty times a second.
+        What <em>cost</em> means is entirely up to the numbers in the formula below — edit
+        them and watch the pendulum change its mind.
+      </p>
     </div>
-    <div class="topbar-actions">
-      <button id="themeBtn" class="icon-btn" data-i18n-title="theme.title" aria-label="Theme">◐</button>
-      <button id="langBtn" class="icon-btn wide" data-i18n="lang.toggle" data-i18n-title="lang.title">EN</button>
-    </div>
+    <button id="themeBtn" class="icon-btn" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
   </header>
 
-  <div class="grid">
+  <!-- ==================== 2. Die Gleichung ==================== -->
+  <section class="card eq-card">
+    <h2 class="card-title">The optimization problem — solved fresh every 20 ms</h2>
 
-    <!-- ================= linke Spalte: Animation und Verlaeufe ============ -->
-    <main class="col-left">
+    <div class="eq-scroll">
+      <div class="eq-main">
+       <div class="eq-part">
+        <math class="mf big"><munder>
+          <mo movablelimits="false">min</mo>
+          <mrow><msub><mi>u</mi><mn>0</mn></msub><mo>&#8230;</mo><msub><mi>u</mi><mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow></msub></mrow>
+        </munder></math>
 
-      <section class="card stage-card">
-        <div class="stage-wrap">
-          <canvas id="scene"></canvas>
-          <div class="hud" id="hud">
-            <div class="hud-row"><span data-i18n="hud.angle"></span><b id="hudTheta">–</b></div>
-            <div class="hud-row"><span data-i18n="hud.pos"></span><b id="hudPos">–</b></div>
-            <div class="hud-row"><span data-i18n="hud.force"></span><b id="hudU">–</b></div>
-            <div class="hud-row"><span data-i18n="hud.dist"></span><b id="hudFd">–</b></div>
-            <div class="hud-sep"></div>
-            <div class="hud-row"><span data-i18n="hud.cost"></span><b id="hudJ">–</b></div>
-            <div class="hud-row"><span data-i18n="hud.solve"></span><b id="hudMs">–</b></div>
-            <div class="hud-row"><span data-i18n="hud.iter"></span><b id="hudIter">–</b></div>
-            <div class="hud-row status" id="hudStatus"></div>
-          </div>
-        </div>
+        <math class="mf big"><mrow><mi>J</mi><mo>=</mo></mrow></math>
+       </div>
 
-        <div class="toolbar">
-          <button id="playBtn" class="btn primary" data-i18n="ctrl.pause">Pause</button>
-          <button id="resetBtn" class="btn" data-i18n="ctrl.reset">Reset</button>
-          <button id="kickLeftBtn" class="btn" data-i18n="ctrl.kickLeft"></button>
-          <button id="kickRightBtn" class="btn" data-i18n="ctrl.kickRight"></button>
-          <button id="dropBtn" class="btn" data-i18n="ctrl.drop"></button>
-          <span class="spacer"></span>
-          <label class="chk"><input type="checkbox" id="showPred" checked><span data-i18n="view.prediction"></span></label>
-          <label class="chk"><input type="checkbox" id="showForces" checked><span data-i18n="view.forces"></span></label>
-          <label class="chk"><input type="checkbox" id="showTrace"><span data-i18n="view.trace"></span></label>
-        </div>
-        <p class="hint" data-i18n="ctrl.hint"></p>
-      </section>
+       <div class="eq-part">
+        <math class="mf big"><munderover>
+          <mo>&#8721;</mo>
+          <mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow>
+          <mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow>
+        </munderover></math>
+       </div>
 
-      <section class="card">
-        <h2 class="card-title" data-i18n="scope.title"></h2>
-        <canvas id="scope"></canvas>
-        <div class="legend">
-          <span class="lg lg-theta">&theta; [&deg;]</span>
-          <span class="lg lg-pos">p [m]</span>
-          <span class="lg lg-u">u [N]</span>
-        </div>
-      </section>
+       <div class="eq-part">
+        <span class="pbrk pbrk-l"></span>
 
-      <section class="card">
-        <h2 class="card-title" data-i18n="scope.uplan"></h2>
-        <canvas id="uplan"></canvas>
-      </section>
+        <math class="mf"><msubsup><mi>e</mi><mi>k</mi><mo>&#8868;</mo></msubsup></math>
 
-    </main>
-
-    <!-- ================= rechte Spalte: Formel und Regler ================= -->
-    <aside class="col-right">
-
-      <section class="card">
-        <h2 class="card-title" data-i18n="formula.title"></h2>
-
-        <math display="block" class="eq">
-          <mrow>
-            <munder>
-              <mo movablelimits="false">min</mo>
-              <mrow><msub><mi>u</mi><mn>0</mn></msub><mo>,</mo><mo>&#8230;</mo><mo>,</mo>
-                    <msub><mi>u</mi><mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow></msub></mrow>
-            </munder>
-            <mspace width="0.35em"/>
-            <mi>J</mi><mo>=</mo>
-            <munderover>
-              <mo>&#8721;</mo>
-              <mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow>
-              <mrow><mi>N</mi><mo>&#8722;</mo><mn>1</mn></mrow>
-            </munderover>
-            <mrow>
-              <mo stretchy="true">(</mo>
-              <msubsup><mi>e</mi><mi>k</mi><mo>&#8868;</mo></msubsup><mi mathvariant="bold">Q</mi><msub><mi>e</mi><mi>k</mi></msub>
-              <mo>+</mo>
-              <mi>R</mi><msubsup><mi>u</mi><mi>k</mi><mn>2</mn></msubsup>
-              <mo stretchy="true">)</mo>
-            </mrow>
-            <mo>+</mo>
-            <msubsup><mi>e</mi><mi>N</mi><mo>&#8868;</mo></msubsup><mi mathvariant="bold">P</mi><msub><mi>e</mi><mi>N</mi></msub>
-          </mrow>
-        </math>
-
-        <p class="eq-label" data-i18n="formula.st"></p>
-        <math display="block" class="eq eq-small">
-          <mtable columnalign="left">
-            <mtr><mtd>
-              <mrow>
-                <msub><mi>x</mi><mrow><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>=</mo>
-                <msub><mi mathvariant="bold">A</mi><mi>d</mi></msub><msub><mi>x</mi><mi>k</mi></msub><mo>+</mo>
-                <msub><mi mathvariant="bold">B</mi><mi>d</mi></msub><msub><mi>u</mi><mi>k</mi></msub>
-                <mo>,</mo><mspace width="0.6em"/>
-                <msub><mi>e</mi><mi>k</mi></msub><mo>=</mo><msub><mi>x</mi><mi>k</mi></msub><mo>&#8722;</mo>
-                <msub><mi>x</mi><mi>soll</mi></msub>
-              </mrow>
-            </mtd></mtr>
-            <mtr><mtd>
-              <mrow>
-                <mrow><mo>|</mo><msub><mi>u</mi><mi>k</mi></msub><mo>|</mo></mrow><mo>&#8804;</mo>
-                <msub><mi>u</mi><mi>max</mi></msub>
-                <mo>,</mo><mspace width="0.6em"/>
-                <msub><mi>x</mi><mn>0</mn></msub><mo>=</mo><mi>x</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo>
-              </mrow>
-            </mtd></mtr>
-          </mtable>
-        </math>
-
-        <details class="legend-details">
-          <summary data-i18n="formula.legendTitle"></summary>
-          <ul class="symbol-list" id="symbolList"></ul>
-        </details>
-      </section>
-
-      <section class="card">
-        <h2 class="card-title" data-i18n="tune.title"></h2>
-
-        <div class="matrix-block">
-          <div class="matrix-head">
-            <span class="mlabel">Q =</span>
-            <div class="colnames">
-              <span>p</span><span>&#7777;</span><span>&theta;</span><span>&#952;&#775;</span>
+        <div class="mx" title="Q — state weights: how expensive each kind of error is">
+          <div class="mx-head"><span>p</span><span>&#7767;</span><span>&theta;</span><span>&#952;&#775;</span></div>
+          <div class="mx-body">
+            <span class="brk brk-l"></span>
+            <div class="mx-grid">
+              <input class="cell in" id="q0" type="number" step="any" inputmode="decimal" title="weight on cart position error [1/m²]">
+              <span class="cell z">0</span><span class="cell z">0</span><span class="cell z">0</span>
+              <span class="cell z">0</span>
+              <input class="cell in" id="q1" type="number" step="any" inputmode="decimal" title="weight on cart velocity [1/(m/s)²]">
+              <span class="cell z">0</span><span class="cell z">0</span>
+              <span class="cell z">0</span><span class="cell z">0</span>
+              <input class="cell in" id="q2" type="number" step="any" inputmode="decimal" title="weight on rod angle [1/rad²]">
+              <span class="cell z">0</span>
+              <span class="cell z">0</span><span class="cell z">0</span><span class="cell z">0</span>
+              <input class="cell in" id="q3" type="number" step="any" inputmode="decimal" title="weight on angular rate [1/(rad/s)²]">
             </div>
+            <span class="brk brk-r"></span>
           </div>
-          <div class="matrix">
-            <div class="brk brk-l"></div>
-            <div class="mgrid">
-              <input class="qin" id="q0" type="number" step="any" inputmode="decimal">
-              <span class="z">0</span><span class="z">0</span><span class="z">0</span>
-              <span class="z">0</span>
-              <input class="qin" id="q1" type="number" step="any" inputmode="decimal">
-              <span class="z">0</span><span class="z">0</span>
-              <span class="z">0</span><span class="z">0</span>
-              <input class="qin" id="q2" type="number" step="any" inputmode="decimal">
-              <span class="z">0</span>
-              <span class="z">0</span><span class="z">0</span><span class="z">0</span>
-              <input class="qin" id="q3" type="number" step="any" inputmode="decimal">
+          <div class="mx-name"><math class="mf"><mi mathvariant="bold">Q</mi></math></div>
+        </div>
+
+        <math class="mf"><msub><mi>e</mi><mi>k</mi></msub></math>
+
+        <math class="mf big"><mo>+</mo></math>
+
+        <div class="mx scalar" title="R — how expensive control force is">
+          <div class="mx-head"><span>&nbsp;</span></div>
+          <div class="mx-body">
+            <input class="cell in" id="rin" type="number" step="any" min="0.0001" inputmode="decimal">
+          </div>
+          <div class="mx-name"><math class="mf"><mi>R</mi></math></div>
+        </div>
+
+        <math class="mf"><msubsup><mi>u</mi><mi>k</mi><mn>2</mn></msubsup></math>
+
+        <span class="pbrk pbrk-r"></span>
+       </div>
+
+       <div class="eq-part pterm">
+        <math class="mf big"><mo>+</mo></math>
+        <math class="mf"><msubsup><mi>e</mi><mi>N</mi><mo>&#8868;</mo></msubsup></math>
+
+        <div class="mx" id="mxP" title="P — terminal weight: the cost of everything beyond the horizon">
+          <div class="mx-head"><span>p</span><span>&#7767;</span><span>&theta;</span><span>&#952;&#775;</span></div>
+          <div class="mx-body">
+            <span class="brk brk-l"></span>
+            <div class="mx-grid" id="pGrid"></div>
+            <span class="brk brk-r"></span>
+          </div>
+          <div class="mx-name"><math class="mf"><mi mathvariant="bold">P</mi></math></div>
+        </div>
+
+        <math class="mf"><msub><mi>e</mi><mi>N</mi></msub></math>
+       </div>
+      </div>
+    </div>
+
+    <div class="eq-foot">
+      <label class="chk pterm" data-only="expert">
+        <input type="checkbox" id="pAuto" checked>
+        <span>P from the Riccati equation <span class="muted">(uncheck to type your own diagonal)</span></span>
+      </label>
+
+      <div class="constraints" data-only="expert">
+        <span class="st-label">subject to, for k = 0 … N−1:</span>
+        <math class="mf"><mrow>
+          <msub><mi>x</mi><mrow><mi>k</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>=</mo>
+          <msub><mi mathvariant="bold">A</mi><mi>d</mi></msub><msub><mi>x</mi><mi>k</mi></msub><mo>+</mo>
+          <msub><mi mathvariant="bold">B</mi><mi>d</mi></msub><msub><mi>u</mi><mi>k</mi></msub>
+        </mrow></math>
+        <math class="mf"><mrow>
+          <mrow><mo>|</mo><msub><mi>u</mi><mi>k</mi></msub><mo>|</mo></mrow><mo>&#8804;</mo>
+          <msub><mi>u</mi><mi>max</mi></msub>
+        </mrow></math>
+        <math class="mf"><mrow>
+          <msub><mi>x</mi><mn>0</mn></msub><mo>=</mo><mi>x</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo>
+        </mrow></math>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. Zustandsvektor und Presets ==================== -->
+  <section class="card def-card">
+    <div class="def-cols">
+
+      <div class="def-state">
+        <h2 class="card-title">What the controller is looking at</h2>
+        <div class="vecdef">
+          <div class="vd-lhs"><math class="mf"><mrow><msub><mi>x</mi><mi>k</mi></msub><mo>=</mo></mrow></math></div>
+          <div class="vd-mat">
+            <span class="brk brk-l"></span>
+            <div class="vd-syms">
+              <span><math class="mf"><mi>p</mi></math></span>
+              <span><math class="mf"><mover accent="true"><mi>p</mi><mo>&#775;</mo></mover></math></span>
+              <span><math class="mf"><mi>&#952;</mi></math></span>
+              <span><math class="mf"><mover accent="true"><mi>&#952;</mi><mo>&#775;</mo></mover></math></span>
             </div>
-            <div class="brk brk-r"></div>
+            <span class="brk brk-r"></span>
           </div>
+          <ul class="vd-desc">
+            <li><b>cart position</b> <span class="unit">[m]</span></li>
+            <li><b>cart velocity</b> <span class="unit">[m/s]</span></li>
+            <li><b>rod angle</b>, 0 = upright <span class="unit">[rad]</span></li>
+            <li><b>angular rate</b> <span class="unit">[rad/s]</span></li>
+          </ul>
         </div>
 
-        <div class="r-row">
-          <span class="mlabel">R =</span>
-          <input class="qin rin" id="rin" type="number" step="any" min="0.0001" inputmode="decimal">
-        </div>
+        <ul class="sym-list">
+          <li>
+            <math class="mf"><mrow><msub><mi>e</mi><mi>k</mi></msub><mo>=</mo><msub><mi>x</mi><mi>k</mi></msub><mo>&#8722;</mo><msub><mi>x</mi><mi>ref</mi></msub></mrow></math>
+            <span>the error the controller <em>expects</em> k steps from now — not a measurement,
+            a prediction from its model. Weighting it with <b>Q</b> is what makes one kind of
+            error more expensive than another.</span>
+          </li>
+          <li>
+            <math class="mf"><msub><mi>u</mi><mi>k</mi></msub></math>
+            <span>the horizontal force on the cart <span class="unit">[N]</span>, k steps from
+            now. It is the only thing the controller can actually do — nothing pushes the rod
+            directly.</span>
+          </li>
+          <li>
+            <math class="mf"><mi>N</mi></math>
+            <span>how many steps it looks ahead. <span class="simple-only">Here that is two
+            seconds of future.</span><span class="expert-only">Look-ahead is N · T<sub>s</sub>;
+            both are adjustable below.</span></span>
+          </li>
+          <li data-only="expert">
+            <math class="mf"><mrow><msub><mi mathvariant="bold">A</mi><mi>d</mi></msub><mo>,</mo><msub><mi mathvariant="bold">B</mi><mi>d</mi></msub></mrow></math>
+            <span>the discrete-time model used for the prediction (zero-order hold, sample time
+            T<sub>s</sub>), obtained by linearising the equations of motion.</span>
+          </li>
+        </ul>
+      </div>
 
-        <p class="hint small" data-i18n="tune.hint"></p>
+      <div class="def-presets">
+        <h2 class="card-title">Starting points</h2>
+        <div class="presets" id="presets">
+          <button class="btn preset" data-q="10,1,100,10" data-r="0.5">
+            <b>Balanced</b><span>a sensible compromise</span>
+          </button>
+          <button class="btn preset" data-q="8,1,60,6" data-r="12">
+            <b>Gentle</b><span>large R — smooth and lazy</span>
+          </button>
+          <button class="btn preset" data-q="200,10,500,25" data-r="0.002">
+            <b>Aggressive</b><span>tiny R — snappy and twitchy</span>
+          </button>
+          <button class="btn preset" data-q="80,6,140,12" data-r="0.25" data-only="expert">
+            <b>Tight position</b><span>holds the cart, swings the rod</span>
+          </button>
+          <button class="btn preset" data-q="0.05,0.05,200,8" data-r="0.5" data-only="expert">
+            <b>Angle only</b><span>rod upright, cart drifts away</span>
+          </button>
+          <button class="btn preset" data-q="10,1,100,10" data-r="0.5" data-n="8" data-terminal="0" data-only="expert">
+            <b>Short-sighted</b><span>N = 8 without P — it falls over</span>
+          </button>
+        </div>
+        <p class="hint">
+          Only the <b>ratio</b> between Q and R matters: multiply both by the same number and
+          the controller does exactly the same thing.
+        </p>
+      </div>
 
-        <div class="preset-label" data-i18n="tune.preset"></div>
-        <div class="presets" id="presets"></div>
-      </section>
+    </div>
+  </section>
 
-      <section class="card">
-        <h2 class="card-title" data-i18n="param.title"></h2>
-
-        <div class="field">
-          <label for="modeSel" data-i18n="param.mode"></label>
-          <select id="modeSel">
-            <option value="linear" data-i18n="param.mode.linear"></option>
-            <option value="nonlinear" data-i18n="param.mode.nonlinear"></option>
-          </select>
-        </div>
-
-        <div class="field slider">
-          <label for="Nin"><span data-i18n="param.N"></span><b id="NVal"></b></label>
-          <input type="range" id="Nin" min="5" max="80" step="1">
-        </div>
-
-        <div class="field slider">
-          <label for="Tsin"><span data-i18n="param.Ts"></span><b id="TsVal"></b></label>
-          <input type="range" id="Tsin" min="5" max="50" step="1">
-        </div>
-
-        <div class="field slider">
-          <label for="umaxin"><span data-i18n="param.umax"></span><b id="umaxVal"></b></label>
-          <input type="range" id="umaxin" min="1" max="40" step="0.5">
-        </div>
-
-        <label class="chk block"><input type="checkbox" id="termChk" checked><span data-i18n="param.terminal"></span></label>
-      </section>
-
-      <section class="card">
-        <h2 class="card-title" data-i18n="plant.title"></h2>
-
-        <div class="field slider">
-          <label for="mpin"><span data-i18n="param.mp"></span><b id="mpVal"></b></label>
-          <input type="range" id="mpin" min="0.05" max="1.5" step="0.01">
-        </div>
-        <div class="field slider">
-          <label for="Mcin"><span data-i18n="param.Mc"></span><b id="McVal"></b></label>
-          <input type="range" id="Mcin" min="0.1" max="3" step="0.01">
-        </div>
-        <div class="field slider">
-          <label for="lin"><span data-i18n="param.l"></span><b id="lVal"></b></label>
-          <input type="range" id="lin" min="0.15" max="1.2" step="0.01">
-        </div>
-        <div class="field slider">
-          <label for="bin"><span data-i18n="param.b"></span><b id="bVal"></b></label>
-          <input type="range" id="bin" min="0" max="2" step="0.01">
-        </div>
-        <div class="field slider">
-          <label for="distin"><span data-i18n="param.disturb"></span><b id="distVal"></b></label>
-          <input type="range" id="distin" min="0" max="3" step="0.05">
-        </div>
-        <div class="field slider">
-          <label for="noisein"><span data-i18n="param.noise"></span><b id="noiseVal"></b></label>
-          <input type="range" id="noisein" min="0" max="30" step="0.5">
-        </div>
-        <div class="field slider">
-          <label for="mmin"><span data-i18n="param.mismatch"></span><b id="mmVal"></b></label>
-          <input type="range" id="mmin" min="-70" max="150" step="1">
-          <span class="hint small" data-i18n="param.mismatchHint"></span>
-        </div>
-        <div class="field slider">
-          <label for="spin"><span data-i18n="param.setpoint"></span><b id="spVal"></b></label>
-          <input type="range" id="spin" min="-150" max="150" step="1">
-        </div>
-      </section>
-
-    </aside>
+  <!-- ==================== 4. Moduswechsel ==================== -->
+  <div class="mode-switch">
+    <button id="modeBtn" class="btn mode-btn">
+      <span class="mode-btn-label">Expert mode</span>
+      <span class="mode-btn-sub">show the model, all tuning parameters and diagnostics</span>
+    </button>
   </div>
 
-  <!-- ===================== Erklaerung ==================================== -->
+  <!-- ==================== 5. Hauptgrafik ==================== -->
+  <section class="card stage-card">
+    <div class="stage-wrap">
+      <canvas id="scene"></canvas>
+      <div class="hud" id="hud">
+        <div class="hud-row"><span>Angle θ</span><b id="hudTheta">–</b></div>
+        <div class="hud-row"><span>Control force u</span><b id="hudU">–</b></div>
+        <div class="hud-row"><span>Your disturbance</span><b id="hudFd">–</b></div>
+        <div class="hud-row" data-only="expert"><span>Position p</span><b id="hudPos">–</b></div>
+        <div class="hud-sep" data-only="expert"></div>
+        <div class="hud-row" data-only="expert"><span>Cost J</span><b id="hudJ">–</b></div>
+        <div class="hud-row" data-only="expert"><span>QP solve time</span><b id="hudMs">–</b></div>
+        <div class="hud-row" data-only="expert"><span>Iterations</span><b id="hudIter">–</b></div>
+        <div class="hud-row status" id="hudStatus" data-only="expert"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button id="playBtn" class="btn primary">Pause</button>
+      <button id="resetBtn" class="btn">Reset</button>
+      <button id="kickLeftBtn" class="btn">Kick ←</button>
+      <button id="kickRightBtn" class="btn">Kick →</button>
+      <button id="dropBtn" class="btn">Large deflection</button>
+      <span class="spacer"></span>
+      <label class="chk"><input type="checkbox" id="showPred" checked><span>Prediction</span></label>
+      <label class="chk" data-only="expert"><input type="checkbox" id="showForces"><span>Forces</span></label>
+      <label class="chk" data-only="expert"><input type="checkbox" id="showTrace"><span>Bob trace</span></label>
+    </div>
+    <p class="hint">
+      Move the mouse close to the ball to push it around · click the rail to set a new target
+      position · Space = pause, R = reset, arrow keys = kick
+    </p>
+  </section>
+
+  <!-- ==================== 6. Verläufe (nur Expert) ==================== -->
+  <section class="card" data-only="expert">
+    <h2 class="card-title">Time histories (last 12 s)</h2>
+    <canvas id="scope"></canvas>
+    <div class="legend">
+      <span class="lg lg-theta">θ [°]</span>
+      <span class="lg lg-pos">p [m]</span>
+      <span class="lg lg-u">u [N]</span>
+    </div>
+  </section>
+
+  <section class="card" data-only="expert">
+    <h2 class="card-title">Planned input sequence over the horizon</h2>
+    <canvas id="uplan"></canvas>
+    <p class="hint">
+      The controller commits only to the first bar. Everything to the right of it is a plan it
+      will throw away and recompute at the next sample.
+    </p>
+  </section>
+
+  <!-- ==================== 7. Einstellungen (nur Expert) ==================== -->
+  <div class="settings-grid" data-only="expert">
+    <section class="card">
+      <h2 class="card-title">Controller</h2>
+
+      <div class="field">
+        <label for="modeSel">Prediction model</label>
+        <select id="modeSel">
+          <option value="linear">linear (about upright)</option>
+          <option value="nonlinear">nonlinear (SQP, 1 iteration per step)</option>
+        </select>
+      </div>
+
+      <div class="field slider">
+        <label for="Nin"><span>Horizon N</span><b id="NVal"></b></label>
+        <input type="range" id="Nin" min="5" max="120" step="1">
+      </div>
+      <div class="field slider">
+        <label for="Tsin"><span>Sample time T<sub>s</sub></span><b id="TsVal"></b></label>
+        <input type="range" id="Tsin" min="5" max="50" step="1">
+      </div>
+      <div class="field slider">
+        <label for="umaxin"><span>Input bound u<sub>max</sub></span><b id="umaxVal"></b></label>
+        <input type="range" id="umaxin" min="1" max="40" step="0.5">
+      </div>
+      <label class="chk block"><input type="checkbox" id="termChk"><span>Terminal weight P in the cost function</span></label>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Plant &amp; reality</h2>
+      <div class="field slider">
+        <label for="mpin"><span>Pendulum mass m</span><b id="mpVal"></b></label>
+        <input type="range" id="mpin" min="0.05" max="1.5" step="0.01">
+      </div>
+      <div class="field slider">
+        <label for="Mcin"><span>Cart mass M</span><b id="McVal"></b></label>
+        <input type="range" id="Mcin" min="0.1" max="3" step="0.01">
+      </div>
+      <div class="field slider">
+        <label for="lin"><span>Rod length l</span><b id="lVal"></b></label>
+        <input type="range" id="lin" min="0.15" max="1.2" step="0.01">
+      </div>
+      <div class="field slider">
+        <label for="bin"><span>Cart friction b</span><b id="bVal"></b></label>
+        <input type="range" id="bin" min="0" max="2" step="0.01">
+      </div>
+      <div class="field slider">
+        <label for="distin"><span>Mouse disturbance strength</span><b id="distVal"></b></label>
+        <input type="range" id="distin" min="0" max="3" step="0.05">
+      </div>
+      <div class="field slider">
+        <label for="noisein"><span>Measurement noise σ</span><b id="noiseVal"></b></label>
+        <input type="range" id="noisein" min="0" max="30" step="0.5">
+      </div>
+      <div class="field slider">
+        <label for="mmin"><span>Controller model error</span><b id="mmVal"></b></label>
+        <input type="range" id="mmin" min="-70" max="150" step="1">
+        <span class="hint small">The controller assumes a pendulum mass off by this much.</span>
+      </div>
+      <div class="field slider">
+        <label for="spin"><span>Target position p<sub>ref</sub></span><b id="spVal"></b></label>
+        <input type="range" id="spin" min="-150" max="150" step="1">
+      </div>
+    </section>
+  </div>
+
+  <!-- ==================== 8. Erläuterungen ==================== -->
   <section class="explain">
-    <h2 data-i18n="ex.title"></h2>
+    <h2 class="explain-title">In a bit more detail</h2>
     <div class="ex-grid">
-      <details open><summary data-i18n="ex.setup.h"></summary><div data-i18n="ex.setup.p"></div></details>
-      <details open><summary data-i18n="ex.mpc.h"></summary><div data-i18n="ex.mpc.p"></div></details>
-      <details open><summary data-i18n="ex.qr.h"></summary><div data-i18n="ex.qr.p"></div></details>
-      <details><summary data-i18n="ex.model.h"></summary><div data-i18n="ex.model.p"></div></details>
-      <details><summary data-i18n="ex.horizon.h"></summary><div data-i18n="ex.horizon.p"></div></details>
-      <details><summary data-i18n="ex.constraints.h"></summary><div data-i18n="ex.constraints.p"></div></details>
-      <details><summary data-i18n="ex.disturb.h"></summary><div data-i18n="ex.disturb.p"></div></details>
-      <details><summary data-i18n="ex.numerics.h"></summary><div data-i18n="ex.numerics.p"></div></details>
-      <details><summary data-i18n="ex.limits.h"></summary><div data-i18n="ex.limits.p"></div></details>
+
+      <details open>
+        <summary>The setup</summary>
+        <div>
+          <p>A cart slides along a horizontal rail. On it sits a freely pivoting rod with a
+          mass at its tip. The only thing you can do is push the cart left or right — there is
+          no motor at the joint. Two things to move, one thing to push with.</p>
+          <p>Upright is an <b>unstable equilibrium</b>. Lean the rod a little and it leans
+          faster and faster: the deviation doubles roughly every 130&nbsp;ms. So the controller
+          has to keep sliding the cart back underneath the centre of mass, forever.</p>
+          <p>There is a second goal — the cart should also end up at its target position. Short
+          term the two goals fight each other: to get to a target on the right, the cart must
+          first duck briefly to the <i>left</i> so the rod tips rightwards. That backward step
+          is visible every time you click a new target, and it is not a flaw — it is what
+          engineers call <b>non-minimum-phase</b> behaviour<span class="expert-only">, a zero
+          in the right half-plane</span>.</p>
+        </div>
+      </details>
+
+      <details open>
+        <summary>How the controller works</summary>
+        <div>
+          <p>Every 20 milliseconds the same five steps run:</p>
+          <ol>
+            <li><b>Measure</b> where the pendulum is right now.</li>
+            <li><b>Predict</b> what would happen over the next N steps for any sequence of cart
+            forces, using a model of the physics.</li>
+            <li><b>Optimise</b>: find the sequence with the lowest total cost J
+            <span class="expert-only">that also respects every bound</span>.</li>
+            <li><b>Apply</b> only the very first force of that sequence, and throw the rest
+            away.</li>
+            <li><b>Repeat</b>, shifted one step into the future.</li>
+          </ol>
+          <p>Throwing away most of the plan sounds wasteful, but it is exactly what turns
+          planning into <b>feedback</b>. Every cycle restarts from a fresh measurement, so a
+          gust of wind, a mouse push or a slightly wrong model all get absorbed automatically.
+          Switch on <i>Prediction</i> above and the ghost trail shows you the plan being
+          reconsidered several times per second.</p>
+        </div>
+      </details>
+
+      <details open>
+        <summary>What Q and R actually do</summary>
+        <div>
+          <p>The cost function is a bargain between two wishes: <em>keep the error small</em>
+          (that is Q) and <em>do not use much force</em> (that is R). Both terms are squared,
+          which keeps the problem convex — there is exactly one best answer, and it can be
+          found reliably in well under a millisecond.</p>
+          <ul>
+            <li><b>Large R</b> → smooth, economical, lazy. Push it far enough and the planned
+            force is no longer enough to beat gravity.</li>
+            <li><b>Large q<sub>θ</sub></b> → the angle becomes the priority; the cart is
+            allowed to wander a long way to keep the rod vertical.</li>
+            <li><b>Large q<sub>p</sub></b> → the cart stays put, and pays for it with bigger
+            swings of the rod.</li>
+            <li><b>q<sub>ṗ</sub> and q<sub>θ̇</sub></b> penalise speeds rather than positions.
+            They act like damping: less overshoot, less oscillation.</li>
+          </ul>
+          <p>Two things are worth knowing. Only the <b>ratio</b> counts — scale Q and R by the
+          same factor and nothing changes at all. And the entries carry <b>units</b>:
+          q<sub>p</sub> acts on m², q<sub>θ</sub> on rad². An error of 0.1&nbsp;rad (5.7°) is
+          physically far more serious than 0.1&nbsp;m of cart offset, which is why
+          q<sub>θ</sub> is usually the biggest number in the matrix.</p>
+          <p class="expert-only">A useful starting point is <b>Bryson's rule</b>: set
+          q<sub>i</sub> = 1 / (largest deviation you can live with)² and
+          R = 1 / u<sub>max</sub>². It rarely gives the final answer, but it gets the orders of
+          magnitude right, which is most of the battle.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Pushing it around</summary>
+        <div>
+          <p>Near the ball, your mouse pointer acts like a finger: a horizontal force is
+          applied to the pendulum mass, depending on how close you are and how fast you are
+          moving. The controller is told <b>nothing</b> about it. It only sees the consequences
+          in the measured state and reacts — which is exactly the situation in a real plant.</p>
+          <p>Park the pointer against the ball and hold it there. The system settles into a new
+          equilibrium with a <b>permanent offset</b>: the rod leans just far enough for the
+          lean to balance your push<span class="expert-only"> — precisely until
+          tan&thinsp;θ = −F<sub>d</sub>/(m&thinsp;g)</span>, and the cart drifts away from its
+          target. Nothing in the cost function accumulates past error, so nothing ever cancels
+          a constant unknown force completely.<span class="expert-only"> The standard fixes are
+          a disturbance observer or a model augmented with an integrating state — usually
+          called offset-free MPC.</span></p>
+          <p class="expert-only">Two more realities are on the sliders. <b>Measurement
+          noise</b> goes straight into the optimisation, because there is no state estimator
+          here — turn it up and the control force gets visibly nervous. <b>Controller model
+          error</b> makes the controller believe in a wrong pendulum mass; being wrong by ±50 %
+          barely matters, which says something reassuring about feedback in general.</p>
+        </div>
+      </details>
+
+      <details data-only="expert">
+        <summary>Simulation versus controller model</summary>
+        <div>
+          <p>What is simulated is the full nonlinear dynamics — Lagrange, Runge–Kutta 4th
+          order, step size T<sub>s</sub>/8:</p>
+          <div class="eq-block">
+            <math display="block" class="mf">
+              <mtable columnalign="right center left">
+                <mtr>
+                  <mtd><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover></mtd>
+                  <mtd><mo>=</mo></mtd>
+                  <mtd><mfrac>
+                    <mrow><mi>u</mi><mo>&#8722;</mo><mi>b</mi><mover accent="true"><mi>p</mi><mo>&#775;</mo></mover>
+                      <mo>+</mo><mi>m</mi><mi>l</mi><msup><mover accent="true"><mi>&#952;</mi><mo>&#775;</mo></mover><mn>2</mn></msup><mi>sin</mi><mi>&#952;</mi>
+                      <mo>&#8722;</mo><mi>m</mi><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mi>cos</mi><mi>&#952;</mi></mrow>
+                    <mrow><mi>M</mi><mo>+</mo><mi>m</mi><msup><mi>sin</mi><mn>2</mn></msup><mi>&#952;</mi></mrow>
+                  </mfrac></mtd>
+                </mtr>
+                <mtr>
+                  <mtd><mover accent="true"><mi>&#952;</mi><mo>&#168;</mo></mover></mtd>
+                  <mtd><mo>=</mo></mtd>
+                  <mtd><mfrac>
+                    <mrow><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mo>&#8722;</mo><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover><mi>cos</mi><mi>&#952;</mi></mrow>
+                    <mi>l</mi>
+                  </mfrac></mtd>
+                </mtr>
+              </mtable>
+            </math>
+          </div>
+          <p>The controller never sees those equations. It only gets a <b>linearised,
+          discrete-time</b> model — exactly as in practice, where the model is always an
+          approximation of something messier.</p>
+          <p>In <i>linear</i> mode the linearisation happens once, about the upright
+          equilibrium; A<sub>d</sub>, B<sub>d</sub> and the QP Hessian are then constant and are
+          only rebuilt when you change a parameter. In <i>nonlinear</i> mode the previously
+          planned input sequence is simulated forward through the nonlinear model and the
+          system is re-linearised at every point along that trajectory — a real-time iteration,
+          one SQP step per sample. It costs about an order of magnitude more computation, and
+          it earns that back by catching the pendulum from deflections where the fixed
+          linearisation is long since nonsense. Try <i>Large deflection</i> in both modes.</p>
+        </div>
+      </details>
+
+      <details data-only="expert">
+        <summary>Horizon N and the terminal weight P</summary>
+        <div>
+          <p>The horizon is finite: whatever happens after step N never enters the sum. That
+          makes a short horizon genuinely dangerous — the controller does not <i>see</i> the
+          fall coming and happily calls a cheap, fatal trajectory optimal.</p>
+          <p>P repairs this. As the solution of the discrete algebraic Riccati equation,
+          e<sub>N</sub><sup>⊤</sup>P&thinsp;e<sub>N</sub> is exactly the cost an LQR would still
+          incur from step N to infinity. Adding it makes a short horizon behave like an
+          infinite one, as long as the input bound stays inactive.</p>
+          <p><b>Try it:</b> pick the <i>Short-sighted</i> preset (N = 8, P off) and the pendulum
+          falls. Now tick the terminal weight back on and change nothing else — the same eight
+          steps of look-ahead suddenly stabilise perfectly.</p>
+          <p>The other way to buy the same safety is simply to look further ahead, which is what
+          simple mode does: no P, but N = 100 — a full two seconds of future. Cheaper to
+          explain, more expensive to compute, and it stops working as soon as you shorten the
+          horizon again.</p>
+          <p>Unticking <i>P from the Riccati equation</i> lets you type your own diagonal
+          terminal weight. It is instructive to see how much worse a hand-picked P is than the
+          one Riccati gives you — the off-diagonal couplings in the automatic solution are
+          doing real work.</p>
+        </div>
+      </details>
+
+      <details data-only="expert">
+        <summary>Constraints — the real reason to use MPC</summary>
+        <div>
+          <p>Without the bound |u<sub>k</sub>| ≤ u<sub>max</sub> this whole problem has a
+          closed-form answer: the LQR, a constant state feedback u = −Kx. No optimisation, no
+          solver, faster and simpler in every respect.</p>
+          <p>The difference only shows up at the limit. An LQR computes as though the bound did
+          not exist and then gets clipped — it plans with force it will never receive. The MPC
+          puts the bound inside the optimisation, so it knows in advance that it will run out
+          of force later and starts countering earlier. That is what the computation buys you,
+          and it is why MPC dominates in process industries where actuators saturate all
+          day.</p>
+          <p>Set u<sub>max</sub> to about 3 N and push the ball hard: the readout reports
+          <i>input bound active</i>, and the planned input sequence visibly sits on its
+          limit.</p>
+          <p>Only input bounds are implemented here. State constraints — a rail of finite
+          length, |p| ≤ p<sub>max</sub> — have the same structure but need a QP solver for
+          general inequalities, plus slack variables so the problem stays solvable when a
+          disturbance pushes you outside anyway.</p>
+        </div>
+      </details>
+
+      <details data-only="expert">
+        <summary>What happens numerically</summary>
+        <div>
+          <p>The state equations are substituted into the cost function (<i>condensed form</i>),
+          X = Φx<sub>0</sub> + ΓU. What is left is a quadratic program in N variables, in the
+          input sequence alone:</p>
+          <div class="eq-block">
+            <math display="block" class="mf">
+              <mrow>
+                <munder><mo movablelimits="false">min</mo><mi mathvariant="bold">U</mi></munder>
+                <mspace width="0.35em"/>
+                <mfrac><mn>1</mn><mn>2</mn></mfrac>
+                <msup><mi mathvariant="bold">U</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">H</mi><mi mathvariant="bold">U</mi>
+                <mo>+</mo>
+                <msup><mi mathvariant="bold">g</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">U</mi>
+                <mo>,</mo><mspace width="0.8em"/>
+                <mi mathvariant="bold">H</mi><mo>=</mo><mn>2</mn>
+                <mo stretchy="false">(</mo><msup><mi mathvariant="bold">&#915;</mi><mo>&#8868;</mo></msup>
+                <mover accent="true"><mi mathvariant="bold">Q</mi><mo>&#175;</mo></mover>
+                <mi mathvariant="bold">&#915;</mi><mo>+</mo><mi>R</mi><mi mathvariant="bold">I</mi><mo stretchy="false">)</mo>
+              </mrow>
+            </math>
+          </div>
+          <p>Because the only constraints are box bounds, the solver stays compact. First the
+          unconstrained solution is computed exactly via a Cholesky factorisation of H. If it
+          happens to lie inside the bounds it already <i>is</i> the optimum — the readout then
+          says <i>exact</i> with 0 iterations, which is the usual case. Otherwise it is clipped
+          and used to start a projected coordinate descent that finds the active set. Each
+          solution also warm-starts the next sample.</p>
+          <p>The displayed solve time is genuinely measured, averaged over recent samples
+          because browsers round their clocks to 100 µs. Typically it stays well under 0.1 ms
+          per sample with a fixed model, and around a millisecond in nonlinear mode where the
+          model and the Hessian are rebuilt from scratch every single step.</p>
+        </div>
+      </details>
+
+      <details data-only="expert">
+        <summary>Where this demo stops being honest</summary>
+        <div>
+          <ul>
+            <li>The full state is assumed measurable. In reality ṗ and θ̇ would be estimated
+            from encoder readings, normally with a Kalman filter, and that estimator has
+            dynamics of its own.</li>
+            <li>No swing-up from hanging: that is not a QP any more and needs genuine nonlinear
+            optimisation or a separate energy-based controller. Nonlinear mode with a long
+            horizon does catch the pendulum from surprisingly large angles, though.</li>
+            <li>The actuator is ideal — no dead time, no dynamics, no quantisation. Dead time
+            in particular is what usually spoils an MPC design first.</li>
+            <li>No state constraints, so the rail is infinitely long and the cart can wander
+            off happily.</li>
+          </ul>
+        </div>
+      </details>
+
     </div>
   </section>
 
   <footer class="foot">
-    <span data-i18n="foot.note"></span>
+    <span>No build step, no dependencies — plain HTML, CSS and JavaScript.</span>
   </footer>
 </div>
-
-<!-- Formelbausteine, die in die Erklaerungstexte eingesetzt werden -->
-<template id="eq-model">
-  <math display="block" class="eq eq-small">
-    <mtable columnalign="right center left">
-      <mtr>
-        <mtd><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover></mtd>
-        <mtd><mo>=</mo></mtd>
-        <mtd>
-          <mfrac>
-            <mrow>
-              <mi>u</mi><mo>&#8722;</mo><mi>b</mi><mover accent="true"><mi>p</mi><mo>&#775;</mo></mover>
-              <mo>+</mo><mi>m</mi><mi>l</mi><msup><mover accent="true"><mi>&#952;</mi><mo>&#775;</mo></mover><mn>2</mn></msup><mi>sin</mi><mi>&#952;</mi>
-              <mo>&#8722;</mo><mi>m</mi><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mi>cos</mi><mi>&#952;</mi>
-            </mrow>
-            <mrow><mi>M</mi><mo>+</mo><mi>m</mi><msup><mi>sin</mi><mn>2</mn></msup><mi>&#952;</mi></mrow>
-          </mfrac>
-        </mtd>
-      </mtr>
-      <mtr>
-        <mtd><mover accent="true"><mi>&#952;</mi><mo>&#168;</mo></mover></mtd>
-        <mtd><mo>=</mo></mtd>
-        <mtd>
-          <mfrac>
-            <mrow><mi>g</mi><mi>sin</mi><mi>&#952;</mi><mo>&#8722;</mo><mover accent="true"><mi>p</mi><mo>&#168;</mo></mover><mi>cos</mi><mi>&#952;</mi></mrow>
-            <mi>l</mi>
-          </mfrac>
-        </mtd>
-      </mtr>
-    </mtable>
-  </math>
-</template>
-
-<template id="eq-qp">
-  <math display="block" class="eq eq-small">
-    <mrow>
-      <munder><mo movablelimits="false">min</mo><mi mathvariant="bold">U</mi></munder>
-      <mspace width="0.35em"/>
-      <mfrac><mn>1</mn><mn>2</mn></mfrac>
-      <msup><mi mathvariant="bold">U</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">H</mi><mi mathvariant="bold">U</mi>
-      <mo>+</mo>
-      <msup><mi mathvariant="bold">g</mi><mo>&#8868;</mo></msup><mi mathvariant="bold">U</mi>
-      <mo>,</mo><mspace width="0.8em"/>
-      <mi mathvariant="bold">H</mi><mo>=</mo><mn>2</mn>
-      <mo stretchy="false">(</mo><msup><mi mathvariant="bold">&#915;</mi><mo>&#8868;</mo></msup>
-      <mover accent="true"><mi mathvariant="bold">Q</mi><mo>&#175;</mo></mover>
-      <mi mathvariant="bold">&#915;</mi><mo>+</mo><mi>R</mi><mi mathvariant="bold">I</mi><mo stretchy="false">)</mo>
-    </mrow>
-  </math>
-</template>
 
 <script src="js/linalg.js"></script>
 <script src="js/model.js"></script>
 <script src="js/mpc.js"></script>
-<script src="js/i18n.js"></script>
 <script src="js/render.js"></script>
 <script src="js/app.js"></script>
 </body>

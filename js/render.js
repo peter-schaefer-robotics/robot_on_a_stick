@@ -1,7 +1,7 @@
 /*
- * Zeichnen von Szene, Zeitverlaeufen und geplanter Stellgroessenfolge.
- * Alle Farben stammen aus den CSS-Variablen, damit Hell/Dunkel automatisch
- * mitgeht. Zeichenkoordinaten: Meter -> CSS-Pixel.
+ * Drawing of the scene, the time histories and the planned input sequence.
+ * All colours come from the CSS variables so light/dark follows automatically.
+ * Drawing coordinates: metres -> CSS pixels.
  */
 (function (root) {
   'use strict';
@@ -28,7 +28,7 @@
     return colors;
   }
 
-  /** Canvas auf Geraetepixel bringen; liefert Groesse in CSS-Pixeln. */
+  /** Scale the canvas to device pixels; returns the size in CSS pixels. */
   function fit(canvas) {
     var dpr = Math.min(root.devicePixelRatio || 1, 2.5);
     var rect = canvas.getBoundingClientRect();
@@ -88,36 +88,36 @@
   }
 
   /**
-   * Hauptszene.
+   * Main scene.
    * v = {
    *   state, plant, u, fd, xref, mouse:{x,y,active,radius},
    *   pred: Float64Array|null, showPred, showForces, trace:[{x,y}], camX, umax
    * }
-   * Liefert die verwendete Transformation zurueck, damit die App
-   * Mauskoordinaten in Meter umrechnen kann.
+   * Returns the transform in use so the app can convert pointer coordinates
+   * back into metres.
    */
   function drawScene(canvas, v) {
     var f = fit(canvas), ctx = f.ctx, w = f.w, h = f.h;
     var C = colors;
-    var viewW = Math.max(2.2, 3.4 * Math.max(0.7, Math.min(1.4, w / 900)));
+    var viewW = Math.max(2.2, 2.6 * Math.max(0.7, Math.min(1.4, w / 900)));
     var scale = w / viewW;
-    var groundY = h * 0.74;
+    var groundY = h * 0.76;
     var camX = v.camX || 0;
     var X = function (x) { return w / 2 + (x - camX) * scale; };
     var Y = function (y) { return groundY - y * scale; };
 
     ctx.clearRect(0, 0, w, h);
 
-    // Hintergrund
+    // background
     ctx.fillStyle = C.panel2;
     roundRect(ctx, 0, 0, w, h, 9); ctx.fill();
 
-    // Massstab: Markierungen alle 0.5 m
+    // scale: ticks every 0.5 m
     ctx.save();
     ctx.strokeStyle = withAlpha(C.faint, 0.28);
     ctx.fillStyle = withAlpha(C.faint, 0.85);
     ctx.lineWidth = 1;
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = '11.5px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'center';
     var m0 = Math.ceil((camX - viewW / 2) / 0.5) * 0.5;
     for (var mx = m0; mx <= camX + viewW / 2; mx += 0.5) {
@@ -130,7 +130,7 @@
     }
     ctx.restore();
 
-    // Schiene
+    // rail
     ctx.strokeStyle = withAlpha(C.faint, 0.5);
     ctx.lineWidth = 3; ctx.lineCap = 'round';
     ctx.beginPath();
@@ -138,7 +138,7 @@
     ctx.lineTo(w, groundY + 1.5);
     ctx.stroke();
 
-    // Sollposition
+    // target position
     var xr = X(v.xref[0]);
     ctx.save();
     ctx.strokeStyle = withAlpha(C.accent, 0.55);
@@ -164,7 +164,7 @@
     var bobY = Y(l * Math.cos(th)) - cartH * 0.82;
     var bobR = Math.max(7, 0.05 * scale);
 
-    // Spur der Kugel
+    // trace of the ball
     if (v.trace && v.trace.length > 1) {
       ctx.save();
       ctx.strokeStyle = withAlpha(C.accent2, 0.32);
@@ -178,7 +178,7 @@
       ctx.restore();
     }
 
-    // Praediktion (Geisterpendel + Bahn der Kugel)
+    // prediction (ghost pendulums plus the path of the ball)
     if (v.showPred && v.pred && v.pred.length >= 4) {
       var n = v.pred.length / 4;
       ctx.save();
@@ -213,7 +213,7 @@
       ctx.restore();
     }
 
-    // Wagen
+    // cart
     ctx.save();
     ctx.fillStyle = C.panel;
     ctx.strokeStyle = withAlpha(C.accent, 0.85);
@@ -226,7 +226,7 @@
     ctx.beginPath(); ctx.arc(pivotX + cartW * 0.28, groundY, wr, 0, 6.2832); ctx.fill();
     ctx.restore();
 
-    // Stab und Kugel
+    // rod and ball
     ctx.save();
     ctx.strokeStyle = C.fg;
     ctx.lineWidth = Math.max(3, 0.016 * scale);
@@ -241,7 +241,7 @@
     ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, 6.2832); ctx.fill();
     ctx.restore();
 
-    // Kraefte
+    // forces
     if (v.showForces) {
       var uLen = (v.u / Math.max(1e-6, v.umax)) * 0.62 * scale;
       if (Math.abs(uLen) > 2) {
@@ -249,7 +249,7 @@
               withAlpha(C.violet, 0.95), 3);
         ctx.save();
         ctx.fillStyle = withAlpha(C.violet, 0.9);
-        ctx.font = '11px ui-monospace, Menlo, monospace';
+        ctx.font = '12.5px ui-monospace, Menlo, monospace';
         ctx.textAlign = uLen > 0 ? 'left' : 'right';
         ctx.fillText('u = ' + v.u.toFixed(1) + ' N',
                      pivotX + uLen + (uLen > 0 ? 6 : -6), groundY - cartH * 0.5 - 8);
@@ -262,7 +262,7 @@
       }
     }
 
-    // Einflussbereich der Maus
+    // radius of influence of the pointer
     if (v.mouse && v.mouse.active) {
       ctx.save();
       var mx2 = X(v.mouse.x), my2 = Y(v.mouse.y) - cartH * 0.82;
@@ -274,7 +274,7 @@
       ctx.restore();
     }
 
-    // Winkelbogen
+    // angle arc
     ctx.save();
     ctx.strokeStyle = withAlpha(C.dim, 0.45);
     ctx.lineWidth = 1;
@@ -289,7 +289,7 @@
       ctx.arc(pivotX, pivotY, l * scale * 0.34, -Math.PI / 2, -Math.PI / 2 + th, th < 0);
       ctx.stroke();
       ctx.fillStyle = withAlpha(C.dim, 0.9);
-      ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = '12.5px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('θ', pivotX + Math.sin(th / 2) * l * scale * 0.46,
                    pivotY - Math.cos(th / 2) * l * scale * 0.46 + 4);
@@ -299,7 +299,7 @@
     return { X: X, Y: Y, scale: scale, groundY: groundY, cartOffset: cartH * 0.82, camX: camX };
   }
 
-  /** Zeitverlaeufe: drei Spuren mit eigener Skalierung. */
+  /** Time histories: three traces, each with its own scaling. */
   function drawScope(canvas, hist, tNow, span, scales) {
     var f = fit(canvas), ctx = f.ctx, w = f.w, h = f.h;
     var C = colors;
@@ -310,7 +310,7 @@
     ctx.fillStyle = C.panel2;
     roundRect(ctx, 0, 0, w, h, 8); ctx.fill();
 
-    // Nulllinie und Zeitraster
+    // zero line and time grid
     ctx.save();
     ctx.strokeStyle = withAlpha(C.faint, 0.25);
     ctx.lineWidth = 1;
@@ -351,10 +351,10 @@
       ctx.stroke();
       ctx.restore();
 
-      // Skalenangabe am rechten Rand
+      // scale annotation on the right
       ctx.save();
       ctx.fillStyle = withAlpha(ser.color, 0.9);
-      ctx.font = '10px ui-monospace, Menlo, monospace';
+      ctx.font = '11.5px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'left';
       ctx.fillText('±' + (ser.scale >= 10 ? ser.scale.toFixed(0) : ser.scale.toFixed(1)) + ser.unit,
                    x1 + 5, y0 + 11 + si * 12);
@@ -362,7 +362,7 @@
     }
   }
 
-  /** Geplante Stellgroessenfolge als Balkendiagramm. */
+  /** Planned input sequence as a bar chart. */
   function drawUPlan(canvas, useq, umax, Ts) {
     var f = fit(canvas), ctx = f.ctx, w = f.w, h = f.h;
     var C = colors;
@@ -383,7 +383,7 @@
     ctx.strokeStyle = withAlpha(C.faint, 0.3);
     ctx.beginPath(); ctx.moveTo(x0, ymid); ctx.lineTo(x1, ymid); ctx.stroke();
     ctx.fillStyle = withAlpha(C.danger, 0.75);
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = '11.5px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'left';
     ctx.fillText('+' + umax.toFixed(0) + 'N', x1 + 4, y0 + 8);
     ctx.fillText('-' + umax.toFixed(0) + 'N', x1 + 4, y1 + 1);
@@ -405,7 +405,7 @@
     }
     ctx.save();
     ctx.fillStyle = withAlpha(C.faint, 0.85);
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = '11.5px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'left';
     ctx.fillText('k=0', x0, y1 + 12);
     ctx.textAlign = 'right';

@@ -1,11 +1,15 @@
 /*
- * Anwendungslogik: Simulationsschleife, Bedienelemente, Stoerungen,
- * Sprach- und Themenumschaltung.
+ * Application logic: simulation loop, controls, disturbances, mode switching.
  *
- * Zeitliche Struktur:
- *   - Simulation: feste Schrittweite h = Ts/8, Runge-Kutta 4
- *   - Regler:     alle Ts (also jeden 8. Simulationsschritt)
- *   - Anzeige:    requestAnimationFrame, entkoppelt von der Simulation
+ * Timing:
+ *   - simulation: fixed step h = Ts/8, Runge-Kutta 4
+ *   - controller: every Ts (that is, every 8th simulation step)
+ *   - display:    requestAnimationFrame, decoupled from the simulation
+ *
+ * Two modes. Simple mode hides everything that is not needed to understand the
+ * idea, and resets those settings to their defaults. Because it also drops the
+ * terminal weight P, it compensates with a longer horizon (N = 100, i.e. two
+ * seconds of look-ahead) - without either of the two, the cart drifts.
  */
 (function (root) {
   'use strict';
@@ -13,38 +17,35 @@
   var M = IPM.model;
   var R = IPM.render;
 
-  var SUB = 8;                 // Simulationsschritte je Regeltakt
-  var SPAN = 12;               // Zeitfenster des Scopes [s]
-  var MOUSE_RADIUS = 0.32;     // Wirkradius der Maus [m]
+  var SUB = 8;                 // simulation steps per control step
+  var SPAN = 12;               // scope window [s]
+  var MOUSE_RADIUS = 0.32;     // radius of influence of the pointer [m]
   var LS = 'ipm-mpc:';
 
-  // --------------------------------------------------------------- Zustand --
+  var MODE_DEFAULTS = {
+    simple: { N: 100, terminal: false, showForces: false },
+    expert: { N: 40, terminal: true, showForces: true }
+  };
+  var COMMON_DEFAULTS = { Ts: 0.02, umax: 15, mode: 'linear' };
+
+  // ------------------------------------------------------------------ state --
   var sim = {
     s: [0, 0, 0.08, 0],
-    t: 0,
-    u: 0,
-    fd: 0,
-    fdMouse: 0,
-    fdKick: 0,
-    kickTimer: 0,
+    t: 0, u: 0, fd: 0, fdMouse: 0, fdKick: 0, kickTimer: 0,
     running: true,
     xref: [0, 0, 0, 0]
   };
 
   var opts = {
-    noise: 0,          // Standardabweichung des Messrauschens (p in m, theta in rad/5)
-    mismatch: 0,       // relativer Fehler der Pendelmasse im Reglermodell
-    distStrength: 1,
-    showPred: true,
-    showForces: true,
-    showTrace: false
+    noise: 0, mismatch: 0, distStrength: 1,
+    showPred: true, showForces: false, showTrace: false
   };
 
   var plant = Object.assign({}, M.DEFAULT_PLANT);
   var ctrl = new IPM.MpcController({ plant: plant });
   var lastRes = null;
-  // Browser runden performance.now() typischerweise auf 100 us; der gleitende
-  // Mittelwert macht die tatsaechliche Rechenzeit trotzdem ablesbar.
+  // Browsers round performance.now() to about 100 us; the running average keeps
+  // the displayed solve time meaningful anyway.
   var msAvg = 0;
 
   var hist = { t: [], th: [], p: [], u: [] };
@@ -54,8 +55,9 @@
   var lastTf = null;
   var mouse = { x: 0, y: 0, vx: 0, active: false, radius: MOUSE_RADIUS, inside: false };
 
-  var els = {};
-  var lang = 'de';
+  var uiMode = 'simple';
+  var pAuto = true;
+  var pCells = [];
 
   function $(id) { return document.getElementById(id); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -64,75 +66,172 @@
     while (a < -Math.PI) a += 2 * Math.PI;
     return a;
   }
-  function store(k, v) { try { localStorage.setItem(LS + k, v); } catch (e) { /* ignoriert */ } }
+  function store(k, v) { try { localStorage.setItem(LS + k, v); } catch (e) { /* ignored */ } }
   function load(k) { try { return localStorage.getItem(LS + k); } catch (e) { return null; } }
+  function fmt(v, d) { return v.toFixed(d === undefined ? 2 : d); }
 
-  // ------------------------------------------------------------------ i18n --
-  var PLACEHOLDERS = {};
-
-  function applyI18n(next) {
-    lang = next;
-    var dict = IPM.i18n[lang] || IPM.i18n.de;
-    document.documentElement.lang = lang;
-    var nodes = document.querySelectorAll('[data-i18n]');
-    for (var i = 0; i < nodes.length; i++) {
-      var key = nodes[i].getAttribute('data-i18n');
-      var val = dict[key];
-      if (val === undefined) continue;
-      for (var ph in PLACEHOLDERS) {
-        if (val.indexOf(ph) >= 0) val = val.split(ph).join(PLACEHOLDERS[ph]);
-      }
-      if (nodes[i].tagName === 'TITLE') nodes[i].textContent = val.replace(/&[a-z]+;/g, '');
-      else nodes[i].innerHTML = val;
-    }
-    var titled = document.querySelectorAll('[data-i18n-title]');
-    for (i = 0; i < titled.length; i++) {
-      var tv = dict[titled[i].getAttribute('data-i18n-title')];
-      if (tv) titled[i].title = tv.replace(/<[^>]+>/g, '');
-    }
-    $('symbolList').innerHTML = dict['formula.legend'];
-    buildPresets();
-    updatePlayLabel();
-    updateReadouts(true);
-    store('lang', lang);
+  /** Compact formatting for the terminal-weight cells. */
+  function fmtP(v) {
+    var a = Math.abs(v);
+    if (a < 5e-4) return '0';
+    if (a >= 100) return v.toFixed(0);
+    if (a >= 10) return v.toFixed(1);
+    if (a >= 1) return v.toFixed(2);
+    if (a >= 0.01) return v.toFixed(3);
+    return v.toExponential(1);
   }
 
-  // --------------------------------------------------------------- Presets --
-  var PRESETS = [
-    { key: 'preset.balanced',     q: [10, 1, 100, 10],     R: 0.5,   N: 40, terminal: true },
-    { key: 'preset.tight',        q: [80, 6, 140, 12],     R: 0.25,  N: 40, terminal: true },
-    { key: 'preset.gentle',       q: [4, 1, 60, 6],        R: 12,    N: 40, terminal: true },
-    { key: 'preset.angleOnly',    q: [0.05, 0.05, 200, 8], R: 0.5,   N: 40, terminal: true },
-    { key: 'preset.aggressive',   q: [200, 10, 500, 25],   R: 0.002, N: 40, terminal: true },
-    { key: 'preset.shortsighted', q: [10, 1, 100, 10],     R: 0.5,   N: 8,  terminal: false }
-  ];
-  var activePreset = 0;
+  // ------------------------------------------------------------ mode switch --
+  function setMode(m) {
+    uiMode = m;
+    document.body.setAttribute('data-mode', m);
+    var d = MODE_DEFAULTS[m];
 
-  function buildPresets() {
-    var dict = IPM.i18n[lang];
-    var box = $('presets');
-    box.innerHTML = '';
-    PRESETS.forEach(function (p, idx) {
-      var b = document.createElement('button');
-      b.className = 'btn' + (idx === activePreset ? ' active' : '');
-      b.innerHTML = dict[p.key];
-      b.addEventListener('click', function () { applyPreset(idx); });
-      box.appendChild(b);
+    // Everything hidden in this mode goes back to its default value.
+    pAuto = true;
+    ctrl.configure({
+      N: d.N, terminal: d.terminal, Ts: COMMON_DEFAULTS.Ts,
+      umax: COMMON_DEFAULTS.umax, mode: COMMON_DEFAULTS.mode, Pdiag: null
+    });
+    Object.assign(plant, M.DEFAULT_PLANT);
+    opts.noise = 0;
+    opts.mismatch = 0;
+    opts.distStrength = 1;
+    opts.showForces = d.showForces;
+    opts.showTrace = false;
+    sim.xref[0] = 0;
+    trace.length = 0;
+
+    pushPlantToCtrl();
+    syncControls();
+    buildPGrid();
+    updateModeButton();
+
+    $('modeBtn').blur();
+  }
+
+  function updateModeButton() {
+    var expert = uiMode === 'expert';
+    $('modeBtn').querySelector('.mode-btn-label').textContent =
+      expert ? 'Simple mode' : 'Expert mode';
+    $('modeBtn').querySelector('.mode-btn-sub').textContent = expert
+      ? 'back to the essentials — hides the details and restores the defaults'
+      : 'show the model, all tuning parameters and diagnostics';
+  }
+
+  function updatePTermVisibility() {
+    document.body.classList.toggle('no-pterm', !ctrl.cfg.terminal);
+  }
+
+  // ------------------------------------------------------- terminal weight --
+  /** Rebuild the 4x4 grid of P: read-only Riccati values or editable diagonal. */
+  function buildPGrid() {
+    var grid = $('pGrid');
+    grid.innerHTML = '';
+    pCells = [];
+    for (var i = 0; i < 4; i++) {
+      for (var j = 0; j < 4; j++) {
+        var el;
+        if (pAuto) {
+          el = document.createElement('span');
+          el.className = 'cell ro';
+          el.textContent = '–';
+        } else if (i === j) {
+          el = document.createElement('input');
+          el.className = 'cell in';
+          el.type = 'number';
+          el.step = 'any';
+          el.inputMode = 'decimal';
+          el.value = String(currentPDiag()[i]);
+          el.addEventListener('input', readPDiag);
+        } else {
+          el = document.createElement('span');
+          el.className = 'cell z';
+          el.textContent = '0';
+        }
+        grid.appendChild(el);
+        pCells.push(el);
+      }
+    }
+    if (pAuto && ctrl.cfg.terminal && !ctrl.Pterm) ctrl.rebuildTerminal();
+    updatePCells(true);
+    updatePTermVisibility();
+  }
+
+  function currentPDiag() {
+    if (ctrl.cfg.Pdiag) return ctrl.cfg.Pdiag.slice();
+    // P is normally computed on the next control step; force it now so the
+    // fields show the Riccati values right away.
+    if (!ctrl.Pterm && ctrl.cfg.terminal) ctrl.rebuildTerminal();
+    var P = ctrl.Pterm;
+    if (P) return [P[0][0], P[1][1], P[2][2], P[3][3]];
+    return ctrl.cfg.q.slice();
+  }
+
+  function readPDiag() {
+    var d = [], ok = true;
+    for (var i = 0; i < 4; i++) {
+      var el = pCells[i * 4 + i];
+      var v = parseFloat(String(el.value).replace(',', '.'));
+      var bad = !isFinite(v) || v < 0;
+      el.classList.toggle('invalid', bad);
+      if (bad) { ok = false; d.push(ctrl.cfg.Pdiag ? ctrl.cfg.Pdiag[i] : 0); } else d.push(v);
+    }
+    ctrl.configure({ Pdiag: d });
+    return ok;
+  }
+
+  /** Refresh the displayed Riccati values (they change with Q, R, Ts, plant). */
+  function updatePCells(force) {
+    if (!pAuto || !ctrl.cfg.terminal) return;
+    var P = ctrl.Pterm;
+    if (!P) {
+      if (force) for (var k = 0; k < 16; k++) pCells[k].textContent = '–';
+      return;
+    }
+    for (var i = 0; i < 4; i++) {
+      for (var j = 0; j < 4; j++) pCells[i * 4 + j].textContent = fmtP(P[i][j]);
+    }
+  }
+
+  // ----------------------------------------------------------------- presets --
+  function bindPresets() {
+    var btns = document.querySelectorAll('.preset');
+    Array.prototype.forEach.call(btns, function (b) {
+      b.addEventListener('click', function () {
+        var q = b.getAttribute('data-q').split(',').map(Number);
+        var r = parseFloat(b.getAttribute('data-r'));
+        var cfg = { q: q, R: r };
+        if (b.hasAttribute('data-n')) cfg.N = parseInt(b.getAttribute('data-n'), 10);
+        if (b.hasAttribute('data-terminal')) cfg.terminal = b.getAttribute('data-terminal') === '1';
+        ctrl.configure(cfg);
+        markPreset(b);
+        syncControls();
+      });
     });
   }
 
-  function applyPreset(idx) {
-    var p = PRESETS[idx];
-    activePreset = idx;
-    ctrl.configure({ q: p.q.slice(), R: p.R, N: p.N, terminal: p.terminal });
-    syncControlsFromCtrl();
-    buildPresets();
+  function markPreset(active) {
+    var btns = document.querySelectorAll('.preset');
+    Array.prototype.forEach.call(btns, function (b) { b.classList.toggle('active', b === active); });
   }
 
-  // ----------------------------------------------------------- UI-Anbindung --
-  function fmt(v, d) { return v.toFixed(d === undefined ? 2 : d); }
+  function matchPreset() {
+    var btns = document.querySelectorAll('.preset');
+    var found = null;
+    Array.prototype.forEach.call(btns, function (b) {
+      if (found) return;
+      var q = b.getAttribute('data-q').split(',').map(Number);
+      var r = parseFloat(b.getAttribute('data-r'));
+      var same = Math.abs(r - ctrl.cfg.R) < 1e-12;
+      for (var i = 0; i < 4 && same; i++) same = Math.abs(q[i] - ctrl.cfg.q[i]) < 1e-12;
+      if (same) found = b;
+    });
+    markPreset(found);
+  }
 
-  function syncControlsFromCtrl() {
+  // ------------------------------------------------------------- UI binding --
+  function syncControls() {
     var c = ctrl.cfg;
     for (var i = 0; i < 4; i++) $('q' + i).value = String(c.q[i]);
     $('rin').value = String(c.R);
@@ -144,10 +243,9 @@
     $('umaxVal').textContent = fmt(c.umax, 1) + ' N';
     $('termChk').checked = !!c.terminal;
     $('modeSel').value = c.mode;
+    $('pAuto').checked = pAuto;
     scopeScales.u = Math.max(5, c.umax);
-  }
 
-  function syncPlantControls() {
     $('mpin').value = String(plant.mp);   $('mpVal').textContent = fmt(plant.mp, 2) + ' kg';
     $('Mcin').value = String(plant.Mc);   $('McVal').textContent = fmt(plant.Mc, 2) + ' kg';
     $('lin').value = String(plant.l);     $('lVal').textContent = fmt(plant.l, 2) + ' m';
@@ -155,29 +253,32 @@
     $('distin').value = String(opts.distStrength);
     $('distVal').textContent = fmt(opts.distStrength, 2) + '×';
     $('noisein').value = String(Math.round(opts.noise * 1000));
-    $('noiseVal').textContent = opts.noise === 0 ? '0' : fmt(opts.noise * 1000, 1) + ' mm / m°';
+    $('noiseVal').textContent = opts.noise === 0 ? 'off' : fmt(opts.noise * 1000, 1) + ' mm';
     $('mmin').value = String(Math.round(opts.mismatch * 100));
     $('mmVal').textContent = (opts.mismatch >= 0 ? '+' : '') + Math.round(opts.mismatch * 100) + ' %';
     $('spin').value = String(Math.round(sim.xref[0] * 100));
     $('spVal').textContent = fmt(sim.xref[0], 2) + ' m';
+    $('showPred').checked = opts.showPred;
+    $('showForces').checked = opts.showForces;
+    $('showTrace').checked = opts.showTrace;
+
+    updatePTermVisibility();
+    matchPreset();
   }
 
-  /** Reglermodell aktualisieren (inkl. absichtlichem Modellfehler). */
+  /** Push the plant parameters to the controller, including deliberate error. */
   function pushPlantToCtrl() {
     ctrl.configure({
       plant: {
-        Mc: plant.Mc,
-        mp: plant.mp * (1 + opts.mismatch),
-        l: plant.l,
-        g: plant.g,
-        b: plant.b
+        Mc: plant.Mc, mp: plant.mp * (1 + opts.mismatch),
+        l: plant.l, g: plant.g, b: plant.b
       }
     });
   }
 
   function readQR() {
-    var q = [], ok = true;
-    for (var i = 0; i < 4; i++) {
+    var q = [], ok = true, i;
+    for (i = 0; i < 4; i++) {
       var el = $('q' + i);
       var v = parseFloat(el.value.replace(',', '.'));
       var bad = !isFinite(v) || v < 0;
@@ -190,8 +291,7 @@
     rel.classList.toggle('invalid', rbad);
     if (rbad) { r = ctrl.cfg.R; ok = false; }
     ctrl.configure({ q: q, R: r });
-    activePreset = -1;
-    buildPresets();
+    matchPreset();
     return ok;
   }
 
@@ -199,48 +299,51 @@
     for (var i = 0; i < 4; i++) $('q' + i).addEventListener('input', readQR);
     $('rin').addEventListener('input', readQR);
 
+    $('pAuto').addEventListener('change', function () {
+      pAuto = this.checked;
+      ctrl.configure({ Pdiag: pAuto ? null : currentPDiag() });
+      buildPGrid();
+    });
+
     $('Nin').addEventListener('input', function () {
-      ctrl.configure({ N: parseInt(this.value, 10) });
-      syncControlsFromCtrl();
+      ctrl.configure({ N: parseInt(this.value, 10) }); syncControls();
     });
     $('Tsin').addEventListener('input', function () {
-      ctrl.configure({ Ts: parseInt(this.value, 10) / 1000 });
-      syncControlsFromCtrl();
+      ctrl.configure({ Ts: parseInt(this.value, 10) / 1000 }); syncControls();
     });
     $('umaxin').addEventListener('input', function () {
-      ctrl.configure({ umax: parseFloat(this.value) });
-      syncControlsFromCtrl();
+      ctrl.configure({ umax: parseFloat(this.value) }); syncControls();
     });
     $('termChk').addEventListener('change', function () {
       ctrl.configure({ terminal: this.checked });
+      updatePTermVisibility();
+      updatePCells(true);
     });
-    $('modeSel').addEventListener('change', function () {
-      ctrl.configure({ mode: this.value });
-    });
+    $('modeSel').addEventListener('change', function () { ctrl.configure({ mode: this.value }); });
 
     $('mpin').addEventListener('input', function () {
-      plant.mp = parseFloat(this.value); pushPlantToCtrl(); syncPlantControls();
+      plant.mp = parseFloat(this.value); pushPlantToCtrl(); syncControls();
     });
     $('Mcin').addEventListener('input', function () {
-      plant.Mc = parseFloat(this.value); pushPlantToCtrl(); syncPlantControls();
+      plant.Mc = parseFloat(this.value); pushPlantToCtrl(); syncControls();
     });
     $('lin').addEventListener('input', function () {
-      plant.l = parseFloat(this.value); pushPlantToCtrl(); syncPlantControls();
+      plant.l = parseFloat(this.value); pushPlantToCtrl(); syncControls();
     });
     $('bin').addEventListener('input', function () {
-      plant.b = parseFloat(this.value); pushPlantToCtrl(); syncPlantControls();
+      plant.b = parseFloat(this.value); pushPlantToCtrl(); syncControls();
     });
     $('distin').addEventListener('input', function () {
-      opts.distStrength = parseFloat(this.value); syncPlantControls();
+      opts.distStrength = parseFloat(this.value); syncControls();
     });
     $('noisein').addEventListener('input', function () {
-      opts.noise = parseFloat(this.value) / 1000; syncPlantControls();
+      opts.noise = parseFloat(this.value) / 1000; syncControls();
     });
     $('mmin').addEventListener('input', function () {
-      opts.mismatch = parseFloat(this.value) / 100; pushPlantToCtrl(); syncPlantControls();
+      opts.mismatch = parseFloat(this.value) / 100; pushPlantToCtrl(); syncControls();
     });
     $('spin').addEventListener('input', function () {
-      sim.xref[0] = parseFloat(this.value) / 100; syncPlantControls();
+      sim.xref[0] = parseFloat(this.value) / 100; syncControls();
     });
 
     $('showPred').addEventListener('change', function () { opts.showPred = this.checked; });
@@ -254,11 +357,12 @@
     $('dropBtn').addEventListener('click', function () { reset(0.49 * (Math.random() < 0.5 ? -1 : 1)); });
     $('kickLeftBtn').addEventListener('click', function () { kick(-1); });
     $('kickRightBtn').addEventListener('click', function () { kick(1); });
+    $('modeBtn').addEventListener('click', function () {
+      setMode(uiMode === 'simple' ? 'expert' : 'simple');
+    });
 
-    $('langBtn').addEventListener('click', function () { applyI18n(lang === 'de' ? 'en' : 'de'); });
     $('themeBtn').addEventListener('click', function () {
-      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-      setTheme(next);
+      setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
     });
 
     document.addEventListener('keydown', function (e) {
@@ -277,19 +381,15 @@
     scene.addEventListener('pointercancel', leave);
     scene.addEventListener('pointerdown', function (e) {
       if (!lastTf) return;
-      // Ohne Hover (Touch/Stift) ist das Ziehen die Stoerung; die Sollposition
-      // wird dort nur ueber den Schieberegler gesetzt.
+      // Without hover (touch, pen) dragging is the disturbance; the target
+      // position is set with the slider there.
       if (e.pointerType === 'touch' || e.pointerType === 'pen') { onPointerMove(e); return; }
-      var pt = toWorld(e);
-      sim.xref[0] = clamp(pt.x, -1.5, 1.5);
-      syncPlantControls();
+      sim.xref[0] = clamp(toWorld(e).x, -1.5, 1.5);
+      syncControls();
     });
   }
 
-  function updatePlayLabel() {
-    var dict = IPM.i18n[lang];
-    $('playBtn').innerHTML = sim.running ? dict['ctrl.pause'] : dict['ctrl.start'];
-  }
+  function updatePlayLabel() { $('playBtn').textContent = sim.running ? 'Pause' : 'Start'; }
 
   function setTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
@@ -305,22 +405,22 @@
     trace.length = 0;
     camX = 0;
     lastRes = null;
+    msAvg = 0;
   }
 
   function kick(dir) {
-    // Kurzer Impuls, ebenfalls an der Gewichtskraft der Kugel bemessen.
+    // Short impulse, scaled by the weight of the ball.
     sim.fdKick = dir * 2.5 * plant.mp * plant.g;
     sim.kickTimer = 0.08;
   }
 
-  // ------------------------------------------------------------ Mausstoerung --
+  // ------------------------------------------------------ mouse disturbance --
   function toWorld(e) {
     var rect = $('scene').getBoundingClientRect();
     var px = e.clientX - rect.left, py = e.clientY - rect.top;
-    var tf = lastTf;
     return {
-      x: tf.camX + (px - rect.width / 2) / tf.scale,
-      y: (tf.groundY - tf.cartOffset - py) / tf.scale
+      x: lastTf.camX + (px - rect.width / 2) / lastTf.scale,
+      y: (lastTf.groundY - lastTf.cartOffset - py) / lastTf.scale
     };
   }
 
@@ -331,14 +431,12 @@
     var pt = toWorld(e);
     var dt = (now - lastPointerT) / 1000;
     if (dt > 0 && dt < 0.2) {
-      var v = (pt.x - mouse.x) / dt;
-      mouse.vx = clamp(0.6 * mouse.vx + 0.4 * v, -12, 12);
+      mouse.vx = clamp(0.6 * mouse.vx + 0.4 * ((pt.x - mouse.x) / dt), -12, 12);
     }
     lastPointerT = now;
     mouse.x = pt.x; mouse.y = pt.y; mouse.inside = true;
   }
 
-  /** Horizontale Kraft der Maus auf die Pendelmasse bestimmen. */
   function updateMouseForce(dt) {
     mouse.vx *= Math.exp(-dt / 0.09);
     if (!mouse.inside || opts.distStrength <= 0) { mouse.active = false; sim.fdMouse = 0; return; }
@@ -347,19 +445,19 @@
     var d = Math.hypot(mouse.x - bx, mouse.y - by);
     if (d > MOUSE_RADIUS) { mouse.active = false; sim.fdMouse = 0; return; }
     mouse.active = true;
-    // Abstossung vom Zeiger: Richtung bleibt auch dicht an der Kugel erhalten,
-    // damit ruhiges Danebenhalten wirkt und nicht nur schnelles Wischen.
-    // Bezugsgroesse ist die Gewichtskraft der Kugel - eine Dauerkraft von rund
-    // der Haelfte davon ist spuerbar, laesst aber noch eine Ruhelage zu.
+    // Repulsion from the pointer. The direction survives right at the ball, so
+    // holding the pointer still also has an effect, not just fast swipes.
+    // Reference is the weight of the ball: a steady push of about half of it is
+    // clearly felt but still leaves an equilibrium to settle into.
     var W = plant.mp * plant.g;
     var dx = bx - mouse.x;
     var wgt = 1 - d / MOUSE_RADIUS;
     var push = 0.55 * W * dx / Math.max(0.05, Math.abs(dx));
-    var drag = 0.35 * W * mouse.vx;                  // Mitnahme durch die Bewegung
+    var drag = 0.35 * W * mouse.vx;
     sim.fdMouse = clamp(opts.distStrength * wgt * (push + drag), -4 * W, 4 * W);
   }
 
-  // ---------------------------------------------------------------- Regelung --
+  // ------------------------------------------------------------- controller --
   function gauss() {
     var u1 = Math.random() || 1e-9, u2 = Math.random();
     return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
@@ -377,12 +475,11 @@
     msAvg += (lastRes.ms - msAvg) * 0.1;
   }
 
-  // ----------------------------------------------------------------- Schleife --
+  // ------------------------------------------------------------------- loop --
   var acc = 0, subCount = 0, lastFrame = 0, frameCount = 0;
 
   function stepSim(dt) {
-    var Ts = ctrl.cfg.Ts;
-    var h = Ts / SUB;
+    var h = ctrl.cfg.Ts / SUB;
     acc += dt;
     var guard = 0;
     while (acc >= h && guard++ < 600) {
@@ -413,12 +510,12 @@
         }
       }
     }
-    if (guard >= 600) acc = 0;   // nach langer Pause nicht aufholen
+    if (guard >= 600) acc = 0;   // do not try to catch up after a long pause
   }
 
   function updateScopeScales() {
-    var i, maxTh = 8, maxP = 0.4;
-    for (i = Math.max(0, hist.t.length - 700); i < hist.t.length; i++) {
+    var maxTh = 8, maxP = 0.4;
+    for (var i = Math.max(0, hist.t.length - 700); i < hist.t.length; i++) {
       var a = Math.abs(hist.th[i]); if (a > maxTh) maxTh = a;
       var b = Math.abs(hist.p[i]); if (b > maxP) maxP = b;
     }
@@ -429,30 +526,28 @@
 
   function updateReadouts(force) {
     if (!force && (frameCount % 4) !== 0) return;
-    var dict = IPM.i18n[lang];
     $('hudTheta').textContent = (sim.s[2] * 180 / Math.PI).toFixed(1) + '°';
-    $('hudPos').textContent = sim.s[0].toFixed(3) + ' m';
     $('hudU').textContent = sim.u.toFixed(2) + ' N';
-    $('hudFd').textContent = sim.fd.toFixed(1) + ' N';
+    $('hudFd').textContent = sim.fd.toFixed(2) + ' N';
+    if (uiMode !== 'expert') return;
+    $('hudPos').textContent = sim.s[0].toFixed(3) + ' m';
     if (lastRes) {
       $('hudJ').textContent = lastRes.cost < 1e5 ? lastRes.cost.toFixed(1) : lastRes.cost.toExponential(2);
       $('hudMs').textContent = msAvg.toFixed(3) + ' ms';
       $('hudIter').textContent = String(lastRes.sweeps);
       var st = $('hudStatus');
-      if (lastRes.saturated) { st.textContent = '⚠ ' + strip(dict['hud.sat']); st.className = 'hud-row status sat'; }
-      else if (lastRes.exact) { st.textContent = '✓ ' + strip(dict['hud.exact']); st.className = 'hud-row status exact'; }
+      if (lastRes.saturated) { st.textContent = '⚠ input bound active'; st.className = 'hud-row status sat'; }
+      else if (lastRes.exact) { st.textContent = '✓ exact (bounds inactive)'; st.className = 'hud-row status exact'; }
       else { st.textContent = ''; st.className = 'hud-row status'; }
     }
+    if (frameCount % 10 === 0) updatePCells(false);
   }
-  function strip(s) { return String(s).replace(/<[^>]+>/g, ''); }
 
   function draw() {
-    // Kamera folgt dem Wagen mit Totzone
-    var dead = 0.55;
-    var target = 0;
+    // camera follows the cart with a dead zone
+    var dead = 0.55, target = camX;
     if (sim.s[0] > camX + dead) target = sim.s[0] - dead;
     else if (sim.s[0] < camX - dead) target = sim.s[0] + dead;
-    else target = camX;
     camX += (target - camX) * 0.08;
 
     lastTf = R.drawScene($('scene'), {
@@ -463,9 +558,11 @@
       trace: opts.showTrace ? trace : null
     });
 
-    updateScopeScales();
-    R.drawScope($('scope'), hist, sim.t, SPAN, scopeScales);
-    R.drawUPlan($('uplan'), lastRes ? lastRes.useq : null, ctrl.cfg.umax, ctrl.cfg.Ts);
+    if (uiMode === 'expert') {
+      updateScopeScales();
+      R.drawScope($('scope'), hist, sim.t, SPAN, scopeScales);
+      R.drawUPlan($('uplan'), lastRes ? lastRes.useq : null, ctrl.cfg.umax, ctrl.cfg.Ts);
+    }
     updateReadouts(false);
   }
 
@@ -476,51 +573,41 @@
     if (!isFinite(dt) || dt < 0) dt = 0;
     if (dt > 0.25) dt = 0.25;
     frameCount++;
-    if (sim.running) stepSim(dt);
-    else updateMouseForce(dt);
+    if (sim.running) stepSim(dt); else updateMouseForce(dt);
     draw();
   }
 
-  // -------------------------------------------------------------------- Start --
+  // ------------------------------------------------------------------ start --
   function init() {
-    els.scene = $('scene');
-    PLACEHOLDERS.MODEL_EQ = $('eq-model').innerHTML;
-    PLACEHOLDERS.QP_EQ = $('eq-qp').innerHTML;
-
-    // URL-Parameter haben Vorrang - dadurch laesst sich die Seite eingebettet
-    // (z. B. als iframe) gezielt konfigurieren: ?lang=en&theme=light&embed=1
+    // URL parameters allow an embedded page to be configured directly:
+    // ?mode=expert&theme=light&embed=1
     var qs = {};
     try {
       new URLSearchParams(root.location.search).forEach(function (v, k) { qs[k] = v; });
-    } catch (e) { /* aeltere Browser: Parameter werden ignoriert */ }
+    } catch (e) { /* older browsers: parameters ignored */ }
 
     if (qs.embed === '1' || qs.embed === 'true') document.body.classList.add('embed');
 
-    var savedTheme = qs.theme || load('theme');
-    if (savedTheme !== 'light' && savedTheme !== 'dark') {
-      savedTheme = (root.matchMedia && root.matchMedia('(prefers-color-scheme: light)').matches)
+    var theme = qs.theme || load('theme');
+    if (theme !== 'light' && theme !== 'dark') {
+      theme = (root.matchMedia && root.matchMedia('(prefers-color-scheme: light)').matches)
         ? 'light' : 'dark';
     }
-    setTheme(savedTheme);
-
-    var savedLang = qs.lang || load('lang');
-    if (savedLang !== 'de' && savedLang !== 'en') {
-      savedLang = (navigator.language || 'de').slice(0, 2) === 'de' ? 'de' : 'en';
-    }
+    setTheme(theme);
 
     bindUI();
-    applyPreset(0);
-    pushPlantToCtrl();
-    syncPlantControls();
-    applyI18n(savedLang);
+    bindPresets();
+    ctrl.configure({ q: [10, 1, 100, 10], R: 0.5 });
+    setMode(qs.mode === 'expert' ? 'expert' : 'simple');
+    updatePlayLabel();
 
     root.addEventListener('resize', function () { R.readColors(); });
 
-    // Zugriffspunkt fuer die Konsole und fuer eine Einbettung in andere Seiten.
+    // Entry point for the console and for embedding in other pages.
     IPM.app = {
       sim: sim, ctrl: ctrl, opts: opts, plant: plant, hist: hist, mouse: mouse,
-      reset: reset, kick: kick, applyPreset: applyPreset, setLang: applyI18n,
-      setTheme: setTheme, result: function () { return lastRes; }
+      reset: reset, kick: kick, setMode: setMode, setTheme: setTheme,
+      result: function () { return lastRes; }
     };
 
     lastFrame = performance.now();

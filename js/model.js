@@ -1,23 +1,23 @@
 /*
- * Streckenmodell: Inverses Pendel auf einem Wagen (Cart-Pole).
+ * Plant model: inverted pendulum on a cart (cart-pole).
  *
- * Zustand  x = [p, p_dot, theta, theta_dot]
- *   p        Wagenposition [m]        (positiv nach rechts)
- *   theta    Stabwinkel [rad]         (0 = aufrecht, positiv = Spitze nach rechts)
- * Eingang  u = Kraft auf den Wagen [N]
- * Stoerung fd = horizontale Kraft auf die Pendelmasse [N] (Maus-"Anstupsen")
+ * State    x = [p, p_dot, theta, theta_dot]
+ *   p        cart position [m]        (positive to the right)
+ *   theta    rod angle [rad]          (0 = upright, positive = tip to the right)
+ * Input    u = force on the cart [N]
+ * Disturb. fd = horizontal force on the pendulum mass [N] (the mouse "push")
  *
- * Angenommen wird ein masseloser Stab der Laenge l mit Punktmasse mp an der
- * Spitze, ein Wagen der Masse Mc und viskose Reibung b im Wagenlager.
+ * Assumed: a massless rod of length l carrying a point mass mp at its tip, a
+ * cart of mass Mc, and viscous friction b in the cart bearing.
  *
- * Bewegungsgleichungen (Lagrange, ohne Kleinwinkelnaeherung):
+ * Equations of motion (Lagrange, no small-angle approximation):
  *
  *   p_ddot     = [ u - b*p_dot + fd*sin^2(th) + mp*l*th_dot^2*sin(th)
  *                  - mp*g*sin(th)*cos(th) ] / (Mc + mp*sin^2(th))
  *   theta_ddot = [ g*sin(th) - p_ddot*cos(th) + (fd/mp)*cos(th) ] / l
  *
- * Diese nichtlinearen Gleichungen werden simuliert. Der Regler bekommt
- * ausschliesslich das linearisierte Modell zu sehen - genau wie in der Praxis.
+ * These nonlinear equations are what gets simulated. The controller only ever
+ * sees the linearised model - exactly as in practice.
  */
 (function (root) {
   'use strict';
@@ -25,14 +25,14 @@
   var IPM = root.IPM = root.IPM || {};
 
   var DEFAULT_PLANT = {
-    Mc: 0.5,   // Wagenmasse [kg]
-    mp: 0.2,   // Pendelmasse [kg]
-    l: 0.5,    // Stablaenge [m]
-    g: 9.81,   // Erdbeschleunigung [m/s^2]
-    b: 0.1     // viskose Reibung Wagen [N s/m]
+    Mc: 0.5,   // cart mass [kg]
+    mp: 0.2,   // pendulum mass [kg]
+    l: 0.5,    // rod length [m]
+    g: 9.81,   // gravity [m/s^2]
+    b: 0.1     // viscous cart friction [N s/m]
   };
 
-  /** Zeitableitung des Zustands, f(x, u, fd). */
+  /** State derivative, f(x, u, fd). */
   function deriv(s, u, fd, p) {
     var dp = s[1], th = s[2], dth = s[3];
     var st = Math.sin(th), ct = Math.cos(th);
@@ -47,7 +47,7 @@
     return [s[0] + h * k[0], s[1] + h * k[1], s[2] + h * k[2], s[3] + h * k[3]];
   }
 
-  /** Ein Simulationsschritt mit klassischem Runge-Kutta 4. */
+  /** One simulation step with classical Runge-Kutta 4. */
   function rk4(s, u, fd, p, h) {
     var k1 = deriv(s, u, fd, p);
     var k2 = deriv(axpy(s, k1, h / 2), u, fd, p);
@@ -62,8 +62,8 @@
   }
 
   /**
-   * Analytische Linearisierung um die aufrechte Ruhelage (theta = 0, u = 0).
-   * Liefert A, B als verschachtelte Arrays und den Offset c = 0.
+   * Analytic linearisation about the upright equilibrium (theta = 0, u = 0).
+   * Returns A, B as nested arrays and the offset c = 0.
    */
   function linearizeUpright(p) {
     var Mc = p.Mc, mp = p.mp, l = p.l, g = p.g, b = p.b;
@@ -80,10 +80,10 @@
   }
 
   /**
-   * Numerische Linearisierung um einen beliebigen Arbeitspunkt (s0, u0):
+   * Numerical linearisation about an arbitrary operating point (s0, u0):
    *   x_dot ~= f(s0,u0) + A (x - s0) + B (u - u0)
    *          = A x + B u + c,   c = f(s0,u0) - A s0 - B u0
-   * Zentrale Differenzen, ausreichend genau fuer diese Anwendung.
+   * Central differences, accurate enough for this application.
    */
   function linearizeAt(s0, u0, p) {
     var eps = 1e-6, n = 4;
@@ -112,7 +112,7 @@
     return { A: A, B: B, c: c };
   }
 
-  /** Gesamtenergie (kinetisch + potentiell), nur zur Anzeige. */
+  /** Total energy (kinetic + potential), for display only. */
   function energy(s, p) {
     var dp = s[1], th = s[2], dth = s[3];
     var T = 0.5 * p.Mc * dp * dp
