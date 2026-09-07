@@ -248,20 +248,31 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 }
 .cell.z { color: var(--fg-dim); font-weight: 400; opacity: .6; }
 .cell.in {
-  background: var(--panel-3); color: var(--accent-2);
-  border: 1px solid var(--border); border-radius: 7px; text-align: center;
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--panel-3));
+  color: var(--accent-2);
+  border: 2px solid color-mix(in srgb, var(--accent-2) 45%, transparent);
+  border-radius: 7px; text-align: center; cursor: text;
   -moz-appearance: textfield; padding: 0 2px;
+  transition: border-color .12s, background-color .12s;
+}
+.cell.in:hover {
+  border-color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 24%, var(--panel-3));
 }
 .cell.in::-webkit-outer-spin-button,
 .cell.in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cell.in:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-.cell.in:hover { border-color: var(--accent); }
 .cell.in.invalid { border-color: var(--danger); color: var(--danger); }
 .cell.ro {              /* Riccati values: shown, not editable */
   color: var(--fg-dim); font-weight: 500; font-size: 13px;
   background: var(--panel-2); border: 1px solid transparent; border-radius: 7px;
 }
 .mx.scalar .cell.in { width: 66px; }
+
+.edit-hint {
+  margin: 2px 0 12px; text-align: center; font-size: 14px; color: var(--fg-dim);
+}
+.edit-hint b { color: var(--accent-2); }
 
 .eq-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
 .constraints {
@@ -292,7 +303,18 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 }
 .vd-desc b { color: var(--fg); font-weight: 600; }
 
+.sym-details > summary {
+  cursor: pointer; list-style: none; font-size: 14.5px; font-weight: 600;
+  color: var(--fg-dim); padding: 8px 0; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.sym-details > summary::-webkit-details-marker { display: none; }
+.sym-details > summary::before { content: "+"; color: var(--accent); font-weight: 700; }
+.sym-details[open] > summary::before { content: "\2013"; }
+.sym-details > summary:hover { color: var(--fg); }
+
 .sym-list { list-style: none; margin: 0; padding: 0; }
+.sym-details .sym-list li:first-child { border-top: 0; }
 .sym-list li {
   display: flex; gap: 12px; align-items: baseline;
   padding: 9px 0; border-top: 1px solid var(--border);
@@ -303,9 +325,15 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 .sym-list b { color: var(--fg); }
 
 .presets { display: flex; flex-direction: column; gap: 8px; }
+.pick-hint { margin: -6px 0 10px; font-size: 14px; color: var(--fg-dim); }
 .presets .btn.preset {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  text-align: left; padding: 9px 13px; width: 100%;
+  text-align: left; padding: 10px 14px; width: 100%;
+  border: 1.5px solid var(--border); background: var(--panel-2);
+  transition: transform .1s, border-color .12s, background-color .12s;
+}
+.presets .btn.preset:hover {
+  border-color: var(--accent); background: var(--panel-3); transform: translateX(2px);
 }
 .presets .btn.preset b { font-size: 15px; font-weight: 620; }
 .presets .btn.preset span { font-size: 13px; color: var(--fg-faint); }
@@ -332,17 +360,28 @@ body[data-play="manual"] .beat-btn {
 }
 .mode-btn {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 16px 46px; border-radius: 14px;
-  background: var(--panel-3); border: 2px solid var(--border);
-  box-shadow: var(--shadow);
+  padding: 15px 40px; border-radius: 12px;
+  border: 2px solid transparent;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel-3));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow);
+  transition: transform .1s, box-shadow .1s, background-color .12s;
 }
-.mode-btn:hover { border-color: var(--accent); }
+.mode-btn:hover {
+  background: color-mix(in srgb, var(--accent) 26%, var(--panel-3));
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.mode-btn:active { transform: translateY(2px); box-shadow: var(--shadow); }
+.beat-btn {
+  background: color-mix(in srgb, var(--accent-2) 16%, var(--panel-3));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent-2) 35%, transparent), var(--shadow);
+}
+.beat-btn:hover {
+  background: color-mix(in srgb, var(--accent-2) 26%, var(--panel-3));
+  border-color: color-mix(in srgb, var(--accent-2) 60%, transparent);
+}
 .mode-btn-label { font-size: 19px; font-weight: 660; letter-spacing: .01em; }
 .mode-btn-sub { font-size: 13.5px; color: var(--fg-faint); }
 /* in simple mode the button is the invitation to go further, so it stands out */
-body[data-mode="simple"] #modeBtn {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-}
 body[data-mode="simple"] #modeBtn .mode-btn-label { color: var(--accent); }
 body[data-mode="expert"] #modeBtn { background: var(--panel); }
 
@@ -392,6 +431,20 @@ html[data-theme="light"] .btn.primary { color: #fff; }
 .hint { color: var(--fg-faint); font-size: 14px; margin: 11px 2px 0; }
 .hint b { color: var(--fg-dim); }
 .hint.small { font-size: 13px; margin-top: 7px; display: block; }
+
+.controls-hint {
+  display: flex; flex-wrap: wrap; gap: 7px 18px; align-items: center;
+  margin: 12px 2px 0; font-size: 14.5px; color: var(--fg-dim);
+}
+.controls-hint > span { display: inline-flex; align-items: center; gap: 6px; }
+.controls-hint b { color: var(--fg); font-weight: 620; }
+kbd {
+  display: inline-block; min-width: 22px; text-align: center;
+  padding: 2px 7px; border-radius: 6px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  background: var(--panel-3); color: var(--fg);
+  font: 600 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 
 .legend { display: flex; gap: 18px; margin-top: 9px; font-size: 13.5px; color: var(--fg-dim); }
 .lg::before {

@@ -24,10 +24,10 @@
       <p class="lead">This is a fun control theory example made accessible in a playful manner.</p>
 
       <p class="lead">
-        The Model Predictive Control (MPC) looks a second or two into the future, works out
-        which cart force keeps the pendulum upright at the lowest cost, applies it, and redoes
-        the whole calculation fifty times a second. What cost means is entirely up to the
-        numbers in the formula below. Edit them and watch the pendulum change its mind.
+        Fifty times a second, the Model Predictive Control (MPC) looks a second or two ahead
+        and picks the cart force that keeps the pendulum upright at the lowest cost. What cost
+        means is up to you: edit the numbers in the formula below and watch the pendulum change
+        its mind.
       </p>
 
       <p class="lead">
@@ -134,6 +134,8 @@
       </div>
     </div>
 
+    <p class="edit-hint"><b>The highlighted numbers are yours to change</b> — click one and type.</p>
+
     <div class="eq-foot">
       <label class="chk pterm" data-only="expert">
         <input type="checkbox" id="pAuto" checked>
@@ -184,7 +186,9 @@
           </ul>
         </div>
 
-        <ul class="sym-list">
+        <details class="sym-details" id="symDetails">
+          <summary>What each symbol means</summary>
+          <ul class="sym-list">
           <li>
             <math class="mf"><mrow><msub><mi>e</mi><mi>k</mi></msub><mo>=</mo><msub><mi>x</mi><mi>k</mi></msub><mo>&#8722;</mo><msub><mi>x</mi><mi>ref</mi></msub></mrow></math>
             <span>the state error the controller <em>expects</em> k steps from
@@ -219,11 +223,13 @@
             <span>the discrete-time model used for the prediction (zero-order hold, sample time
             T<sub>s</sub>), obtained by linearising the equations of motion.</span>
           </li>
-        </ul>
+          </ul>
+        </details>
       </div>
 
       <div class="def-presets">
         <h2 class="card-title">Starting points</h2>
+        <p class="pick-hint">Pick one to load its weights:</p>
         <div class="presets" id="presets">
           <button class="btn preset" data-q="10,1,100,10" data-r="0.5">
             <b>Balanced</b><span>a sensible compromise</span>
@@ -298,13 +304,18 @@
       <label class="chk" data-only="expert"><input type="checkbox" id="showForces"><span>Forces</span></label>
       <label class="chk" data-only="expert"><input type="checkbox" id="showTrace"><span>Bob trace</span></label>
     </div>
-    <p class="hint mpc-only">
-      Move the mouse close to the ball to push it around. Click the rail to set a new target
-      position. Space = pause. R = reset. Arrow keys = kick.
+    <p class="controls-hint mpc-only">
+      <span><b>Move the mouse next to the robot</b> to push it</span>
+      <span><b>Click the rail</b> to set a new target</span>
+      <span><kbd>Space</kbd> pause</span>
+      <span><kbd>R</kbd> reset</span>
+      <span><kbd>←</kbd><kbd>→</kbd> kick</span>
     </p>
-    <p class="hint manual-only">
-      Click and drag anywhere in the scene, or hold the arrow keys, to move the cart.
-      Space = pause. R = reset.
+    <p class="controls-hint manual-only">
+      <span><b>Click and drag the scene</b> to move the cart</span>
+      <span><kbd>←</kbd><kbd>→</kbd> hold to move</span>
+      <span><kbd>Space</kbd> pause</span>
+      <span><kbd>R</kbd> reset</span>
     </p>
   </section>
 
@@ -399,7 +410,7 @@
     <h2 class="explain-title">In a bit more detail</h2>
     <div class="ex-grid">
 
-      <details open>
+      <details>
         <summary>The setup</summary>
         <div>
           <p>A cart slides along a horizontal rail. On it sits a freely pivoting rod with a
@@ -418,7 +429,7 @@
         </div>
       </details>
 
-      <details open>
+      <details>
         <summary>How the controller works</summary>
         <div>
           <p>Every 20 milliseconds the same five steps run:</p>
@@ -439,7 +450,7 @@
         </div>
       </details>
 
-      <details open>
+      <details>
         <summary>What Q and R actually do</summary>
         <div>
           <p>The cost function is a bargain between two wishes: <em>keep the state error

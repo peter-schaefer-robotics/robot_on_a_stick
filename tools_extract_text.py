@@ -285,9 +285,9 @@ for btn in find_all(root, cls='preset'):
     subs = [k for k in btn.kids if not isinstance(k, Text) and k.tag == 'span']
     A('- ' + mark + '**' + name + '** — ' + (txt(subs[0]) if subs else ''))
 A('')
-_ph = find(defcard, cls='hint')
+_ph = find(defcard, cls='pick-hint')
 if _ph is not None:
-    A('`presets.hint:`')
+    A('`presets.pickhint:`')
     A('')
     A(txt(_ph))
     A('')
@@ -358,9 +358,11 @@ for lab in [k for k in tb.kids if not isinstance(k, Text) and 'chk' in k.attrs.g
     mark = '[expert] ' if lab.attrs.get('data-only') == 'expert' else ''
     A('- ' + mark + txt(lab))
 A('')
-A('`stage.hint:`')
+A('`stage.hint:`  (control legend under the scene, one version per play mode)')
 A('')
-A(txt(find(find(root, cls='stage-card'), cls='hint')))
+for _h in find_all(find(root, cls='stage-card'), cls='controls-hint'):
+    _m = '[beat] ' if 'manual-only' in _h.attrs.get('class', '') else '[controller] '
+    A('- ' + _m + txt(_h))
 A('')
 
 # ----------------------------------------------------------------- plots ---

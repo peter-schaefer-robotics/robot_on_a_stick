@@ -98,6 +98,10 @@ Starting points
 - [expert] **Angle only** — rod upright, cart drifts away
 - [expert] **Short-sighted** — N = 8 without P — it falls over
 
+`presets.pickhint:`
+
+Pick one to load its weights:
+
 ## 6 · Mode buttons
 
 Two buttons side by side, each with a label and a subtitle. The labels live in
@@ -157,9 +161,10 @@ drag the cart)
 - [expert] Forces
 - [expert] Bob trace
 
-`stage.hint:`
+`stage.hint:`  (control legend under the scene, one version per play mode)
 
-Move the mouse close to the ball to push it around. Click the rail to set a new target position. Space = pause. R = reset. Arrow keys = kick.
+- [controller] **Move the mouse next to the robot** to push it **Click the rail** to set a new target Space pause R reset ←→ kick
+- [beat] **Click and drag the scene** to move the cart ←→ hold to move Space pause R reset
 
 ## 8 · Plots  [expert]
 

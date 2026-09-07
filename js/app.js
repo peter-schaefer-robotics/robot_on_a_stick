@@ -125,6 +125,11 @@
     sim.xref[0] = 0;
     trace.length = 0;
 
+    // The symbol list is reference material: open in expert mode, folded away
+    // in simple mode.
+    var sd = $('symDetails');
+    if (sd) sd.open = (m === 'expert');
+
     pushPlantToCtrl();
     syncControls();
     buildPGrid();
