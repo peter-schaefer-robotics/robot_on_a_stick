@@ -44,7 +44,7 @@ This is a fun control theory example made accessible in a playful manner.
 
 `eq.cardtitle:`
 
-The optimization problem — solved every 20 ms
+The optimization problem
 
 The formula itself is built from MathML plus the editable matrix fields:
 
@@ -97,10 +97,6 @@ Starting points
 - [expert] **Tight position** — holds the cart, swings the rod
 - [expert] **Angle only** — rod upright, cart drifts away
 - [expert] **Short-sighted** — N = 8 without P — it falls over
-
-`presets.pickhint:`
-
-Pick one to load its weights:
 
 ## 6 · Mode buttons
 
@@ -163,8 +159,8 @@ drag the cart)
 
 `stage.hint:`  (control legend under the scene, one version per play mode)
 
-- [controller] **Move the mouse next to the robot** to push it **Click the rail** to set a new target Space pause R reset ←→ kick
-- [beat] **Click and drag the scene** to move the cart ←→ hold to move Space pause R reset
+- [controller] **next to the robot** to push it **the rail** to set a new target Space pause R reset ←→ kick
+- [beat] **drag the scene** to move the cart ←→ hold to move Space pause R reset
 
 ## 8 · Plots  [expert]
 

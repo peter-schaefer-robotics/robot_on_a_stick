@@ -119,9 +119,12 @@ body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 }
 .lead { margin: 0 0 13px; color: var(--fg-dim); font-size: 17px; max-width: 68ch; }
 .lead:last-child { margin-bottom: 0; }
-.lead.spaced { margin-top: 26px; }
-.lead.spaced a { color: var(--accent); text-decoration: none; }
-.lead.spaced a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.lead.spaced { margin-top: 18px; }
+.lead b { font-weight: 600; }   /* a nudge, not a shout */
+/* In-text links: no underline, no marker - only a colour shift on hover.
+   The call to action below styles itself separately. */
+.lead:not(.cta) a { color: inherit; text-decoration: none; }
+.lead:not(.cta) a:hover { color: var(--accent); }
 #explanations { scroll-margin-top: 18px; }
 .lead em { color: var(--fg); font-style: normal; font-weight: 600; }
 .lead.cta {
@@ -136,11 +139,10 @@ body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 }
 .lead.cta a::before { content: "→"; color: var(--accent); font-weight: 700; }
 .lead.cta:hover { border-left-color: var(--accent-2); }
-.lead.cta a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.lead.cta a:hover::before { text-decoration: none; }
+.lead.cta a:hover { color: var(--accent); }
 
 /* the invitation in the hero jumps to the buttons and the animation */
-#playground { scroll-margin-top: 18px; }
+#playground, #equation { scroll-margin-top: 18px; }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
@@ -273,11 +275,6 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 }
 .mx.scalar .cell.in { width: 66px; }
 
-.edit-hint {
-  margin: 2px 0 12px; text-align: center; font-size: 14px; color: var(--fg-dim);
-}
-.edit-hint b { color: var(--accent-2); }
-
 .eq-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
 .constraints {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
@@ -329,20 +326,43 @@ math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", Georgi
 .sym-list b { color: var(--fg); }
 
 .presets { display: flex; flex-direction: column; gap: 8px; }
-.pick-hint { margin: -6px 0 10px; font-size: 14px; color: var(--fg-dim); }
 .presets .btn.preset {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  text-align: left; padding: 10px 14px; width: 100%;
-  border: 1.5px solid var(--border); background: var(--panel-2);
-  transition: transform .1s, border-color .12s, background-color .12s;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name chev" "desc chev";
+  align-items: center; column-gap: 12px;
+  text-align: left; padding: 11px 14px; width: 100%;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: transform .1s, box-shadow .1s, background-color .12s, border-color .12s;
+}
+.presets .btn.preset b { grid-area: name; font-size: 15.5px; font-weight: 640; }
+.presets .btn.preset span { grid-area: desc; font-size: 13px; color: var(--fg-dim); }
+/* a chevron makes it read as "press me" rather than "read me" */
+.presets .btn.preset::after {
+  content: "›"; grid-area: chev;
+  font-size: 22px; line-height: 1; font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 75%, transparent);
+  transition: transform .12s;
 }
 .presets .btn.preset:hover {
-  border-color: var(--accent); background: var(--panel-3); transform: translateX(2px);
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel-2));
+  border-color: var(--accent);
 }
-.presets .btn.preset b { font-size: 15px; font-weight: 620; }
-.presets .btn.preset span { font-size: 13px; color: var(--fg-faint); }
-.presets .btn.preset.active { border-color: var(--accent); background: var(--panel-3); }
+.presets .btn.preset:hover::after { transform: translateX(3px); }
+.presets .btn.preset:active {
+  transform: translateY(2px); box-shadow: none;
+}
+.presets .btn.preset.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-2));
+  box-shadow: none; transform: translateY(2px);
+}
 .presets .btn.preset.active b { color: var(--accent); }
+.presets .btn.preset.active::after { content: "✓"; font-size: 17px; }
+.presets .btn.preset.active:hover::after { transform: none; }
 
 /* ===================== mode switch ====================================== */
 .mode-switch {
@@ -442,6 +462,15 @@ html[data-theme="light"] .btn.primary { color: #fff; }
 }
 .controls-hint > span { display: inline-flex; align-items: center; gap: 6px; }
 .controls-hint b { color: var(--fg); font-weight: 620; }
+.ikey {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 24px; padding: 0 5px; border-radius: 6px;
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  background: var(--panel-3); color: var(--fg);
+  vertical-align: middle;
+}
+.ikey svg { width: auto; height: 15px; display: block; }
+
 kbd {
   display: inline-block; min-width: 22px; text-align: center;
   padding: 2px 7px; border-radius: 6px;

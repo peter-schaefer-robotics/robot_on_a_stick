@@ -26,18 +26,18 @@
       <p class="lead">
         The rod falls on its own, and the cart is the only handle you have. The MPC (the
         controller) looks 1&ndash;2 seconds ahead, picks the optimal force trajectory that keeps
-        the rod up, and applies just the first one.
+        the rod up, and applies just the first step.
       </p>
 
-      <p class="lead"><b>What cheapest means is up to you: Edit the equation below!</b></p>
+      <p class="lead">What optimal means is up to you: <b><a href="#equation">Edit the equation below!</a></b></p>
 
       <p class="lead">
-        In Expert mode you get more parameters to edit, more explanations and visual.
+        In Expert mode you get more parameters to edit, more explanations and visuals.
       </p>
 
-      <p class="lead spaced"><a href="#explanations">Check out detailed explanations below.</a></p>
-
       <p class="lead cta"><a href="#playground">Try it out and move your mouse next to the pole tip!</a></p>
+
+      <p class="lead spaced"><a href="#explanations">Check out detailed explanations below.</a></p>
     </div>
 
     <!-- decorative miniature of the very thing the page is about -->
@@ -52,8 +52,8 @@
   </header>
 
   <!-- ==================== 2. Die Gleichung ==================== -->
-  <section class="card eq-card">
-    <h2 class="card-title">The optimization problem — solved every 20 ms</h2>
+  <section class="card eq-card" id="equation">
+    <h2 class="card-title">The optimization problem</h2>
 
     <div class="eq-scroll">
       <div class="eq-main">
@@ -135,8 +135,6 @@
        </div>
       </div>
     </div>
-
-    <p class="edit-hint"><b>The highlighted numbers are yours to change</b> — click one and type.</p>
 
     <div class="eq-foot">
       <label class="chk pterm" data-only="expert">
@@ -231,7 +229,6 @@
 
       <div class="def-presets">
         <h2 class="card-title">Starting points</h2>
-        <p class="pick-hint">Pick one to load its weights:</p>
         <div class="presets" id="presets">
           <button class="btn preset" data-q="10,1,100,10" data-r="0.5">
             <b>Balanced</b><span>a sensible compromise</span>
@@ -307,14 +304,14 @@
       <label class="chk" data-only="expert"><input type="checkbox" id="showTrace"><span>Bob trace</span></label>
     </div>
     <p class="controls-hint mpc-only">
-      <span><b>Move the mouse next to the robot</b> to push it</span>
-      <span><b>Click the rail</b> to set a new target</span>
+      <span><span class="ikey" aria-hidden="true"><svg viewBox="0 0 21 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="10.2" y="1.9" width="7.4" height="12.2" rx="3.7"/><line x1="13.9" y1="4.6" x2="13.9" y2="6.8"/><line x1="1.2" y1="4.6" x2="6.2" y2="4.6"/><line x1="3" y1="8" x2="7" y2="8"/><line x1="1.2" y1="11.4" x2="6.2" y2="11.4"/></svg></span> <b>next to the robot</b> to push it</span>
+      <span><span class="ikey" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1.9A3.8 3.8 0 0 0 4.2 5.7V6.7H8Z" fill="currentColor" stroke="none"/><rect x="4.2" y="1.9" width="7.6" height="12.2" rx="3.8"/><line x1="4.4" y1="6.7" x2="11.6" y2="6.7"/><line x1="8" y1="2" x2="8" y2="6.7"/></svg></span> <b>the rail</b> to set a new target</span>
       <span><kbd>Space</kbd> pause</span>
       <span><kbd>R</kbd> reset</span>
       <span><kbd>←</kbd><kbd>→</kbd> kick</span>
     </p>
     <p class="controls-hint manual-only">
-      <span><b>Click and drag the scene</b> to move the cart</span>
+      <span><span class="ikey" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1.9A3.8 3.8 0 0 0 4.2 5.7V6.7H8Z" fill="currentColor" stroke="none"/><rect x="4.2" y="1.9" width="7.6" height="12.2" rx="3.8"/><line x1="4.4" y1="6.7" x2="11.6" y2="6.7"/><line x1="8" y1="2" x2="8" y2="6.7"/></svg></span> <b>drag the scene</b> to move the cart</span>
       <span><kbd>←</kbd><kbd>→</kbd> hold to move</span>
       <span><kbd>Space</kbd> pause</span>
       <span><kbd>R</kbd> reset</span>
