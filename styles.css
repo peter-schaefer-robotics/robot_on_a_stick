@@ -119,6 +119,10 @@ body[data-play="manual"] #scene.grabbing { cursor: grabbing; }
 }
 .lead { margin: 0 0 13px; color: var(--fg-dim); font-size: 17px; max-width: 68ch; }
 .lead:last-child { margin-bottom: 0; }
+.lead.spaced { margin-top: 26px; }
+.lead.spaced a { color: var(--accent); text-decoration: none; }
+.lead.spaced a:hover { text-decoration: underline; text-underline-offset: 3px; }
+#explanations { scroll-margin-top: 18px; }
 .lead em { color: var(--fg); font-style: normal; font-weight: 600; }
 .lead.cta {
   margin-top: 16px; color: var(--fg); font-weight: 600;
